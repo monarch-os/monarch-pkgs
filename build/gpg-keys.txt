@@ -1,0 +1,3 @@
+# GPG Keys to Import for Package Verification
+# Format: URL or keyid (for default keyserver)
+# Lines starting with # are comments

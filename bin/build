@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Abort if anything fails
+set -e
+
+# Source common functions
+BUILD_ROOT=$(realpath "${BASH_SOURCE[0]%/*}/..")
+source "$BUILD_ROOT/helpers/message-helpers.sh"
+source "$BUILD_ROOT/helpers/docker-helpers.sh"
+source "$BUILD_ROOT/helpers/paths.sh"
+
+# Create directories if they don't exist
+mkdir -p "$BUILD_OUTPUT_DIR" "$REPO_DIR" "$SRC_DIR"
+
+print_header "Monarch AUR Package Builder"
+
+# Check Docker is available
+check_docker
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  --arch)
+    ARCH="$2"
+    update_arch_paths
+    shift 2
+    ;;
+  --package)
+    shift
+    PACKAGES=""
+    while [[ $# -gt 0 && ! "$1" =~ ^-- ]]; do
+      PACKAGES="$PACKAGES $1"
+      shift
+    done
+    PACKAGES="${PACKAGES# }"
+    ;;
+  -h | --help)
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --arch <arch>        Target architecture (x86_64 or aarch64, default: x86_64)"
+    echo "  --package <names>    Build only the specified package(s) (space-separated)"
+    echo "  -h, --help           Show this help message"
+    echo ""
+    echo "This script builds AUR packages from:"
+    echo "  build/packages/monarch-aur.packages"
+    echo ""
+    echo "Or build a single package with --package:"
+    echo "  Package can be: AUR package, GitHub repo (owner/repo), or local PKGBUILD"
+    echo "  Options can be appended after package name (skip-pgp, install, always-build, etc.)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 --arch aarch64"
+    echo "  $0 --package yay"
+    echo "  $0 --package yay elephant cursor-bin"
+    echo ""
+    exit 0
+    ;;
+  *)
+    print_error "Unknown option: $1"
+    exit 1
+    ;;
+  esac
+done
+
+# Show target architecture after parsing args
+print_info "Target architecture: $ARCH"
+print_info "Build workspace: $BUILD_OUTPUT_DIR"
+print_info "Final output: $REPO_DIR"
+
+# Clean build-output directory to start fresh
+print_info "Cleaning build workspace..."
+rm -rf "$BUILD_OUTPUT_DIR"/*
+mkdir -p "$BUILD_OUTPUT_DIR"
+
+# Check if AUR package list exists (only required if not building specific packages)
+if [[ -z "$PACKAGES" ]]; then
+  if [[ ! -f "$BUILD_DIR/packages/monarch-aur.packages" ]]; then
+    print_error "monarch-aur.packages not found at $BUILD_DIR/packages/"
+    exit 1
+  fi
+else
+  print_info "Building packages: $PACKAGES"
+fi
+
+# Build/update the Docker image
+build_docker_image "$BUILD_DIR" "$ARCH"
+
+print_info "Running AUR package build..."
+
+# Ensure output directories are writable by container user
+make_dir_writable "$BUILD_OUTPUT_DIR"
+make_dir_writable "$REPO_DIR"
+
+# Build Docker arguments
+DOCKER_ARGS=(
+  --rm
+  -e ARCH="$ARCH"
+  -e PACKAGES="$PACKAGES"
+  -v "$BUILD_ROOT/build-output:/build-output"
+  -v "$BUILD_ROOT/pkgs.monarchlinux.com:/pkgs.monarchlinux.com"
+  -v "$BUILD_DIR:/build:ro"
+  -v "$BUILD_ROOT/pkgbuilds:/pkgbuilds:ro"
+)
+
+# Run the builder with assembled args
+IMAGE_TAG="monarch-pkg-builder:latest-$ARCH"
+PLATFORM_ARG=$(get_platform_arg "$ARCH")
+
+docker run $PLATFORM_ARG "${DOCKER_ARGS[@]}" "$IMAGE_TAG" /build/build.sh
+
+BUILD_RESULT=$?
+
+# Summary
+echo ""
+if [[ $BUILD_RESULT -eq 0 ]]; then
+  print_success "AUR build completed successfully!"
+else
+  print_warning "Some AUR packages failed (see details above)"
+  exit $BUILD_RESULT
+fi
