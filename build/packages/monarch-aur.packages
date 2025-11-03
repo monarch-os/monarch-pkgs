@@ -1,26 +1,21 @@
 # AUR Sync List - Packages to sync from AUR with bin/aur-sync
 
-bettercap
-binwalk
 caido-desktop
 deezer
 fabric-ai-bin
 ffuf-bin
-fq
-fx
-gitleaks
 gau
-hashcat
 ligolo-ng-git
 massdns
-nmap
 onlyoffice-bin
 posting
-socat
 sshm-bin
-traceroute
 waybackurls
-websocat
 vicinae-bin
-xorg-xhost
 zsh-theme-powerlevel10k
+
+
+# for posting
+python-click-default-group
+python-openapi-pydantic
+python-textual-autocomplete
