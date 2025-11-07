@@ -5,7 +5,7 @@ set -e
 
 ARCH=${ARCH:-x86_64}
 PACKAGE_NAME="$1"
-REPO_DIR="/pkgs.omarchy.org/$ARCH"
+REPO_DIR="/pkgs.monarchlinux.com/$ARCH"
 
 if [[ -z "$PACKAGE_NAME" ]]; then
   echo "ERROR: Package name required"
