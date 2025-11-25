@@ -33,6 +33,7 @@ build_docker_image() {
   docker buildx build \
     --platform "$platform" \
     --load \
+    --no-cache \
     -t "$image_tag" \
     -f "$build_dir/Dockerfile" \
     "$build_dir"
