@@ -3,7 +3,7 @@
 _pkgname=ligolo-ng
 pkgname=${_pkgname}-git
 pkgver=0.8.2
-pkgrel=1
+pkgrel=2
 pkgdesc="An advanced, yet simple, tunneling/pivoting tool that uses a TUN interface."
 arch=('x86_64' 'armv7h' 'aarch64')
 url="https://github.com/nicocha30/ligolo-ng"
@@ -22,7 +22,13 @@ prepare() {
 }
 
 build() {
-    cd "${_pkgname}-${pkgver}"
+  export CGO_CPPFLAGS="${CPPFLAGS}"
+  export CGO_CFLAGS="${CFLAGS}"
+  export CGO_CXXFLAGS="${CXXFLAGS}"
+  export CGO_LDFLAGS="${LDFLAGS}"
+  export GOFLAGS="-trimpath -mod=readonly -modcacherw"
+
+  cd "${_pkgname}-${pkgver}"
 
     go build -o proxy cmd/proxy/main.go
     
