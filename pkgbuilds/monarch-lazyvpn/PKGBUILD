@@ -1,0 +1,56 @@
+# Maintainer: y0no <y0no@monarch.sh>
+# Contributor: blank-query
+
+pkgname=monarch-lazyvpn
+pkgver=0.9.0
+pkgrel=1
+pkgdesc="WireGuard VPN manager for Monarch with systemd-networkd integration"
+arch=('any')
+url="https://github.com/monarch-os/monarch-lazyvpn"
+license=('MIT')
+depends=(
+    'wireguard-tools'
+    'curl'
+    'bc'
+    'iptables'
+    'bind'
+    'systemd'
+    'fzf'
+)
+optdepends=(
+    'hyprland: keyboard shortcuts support'
+)
+source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v$pkgver"
+        "lazyvpn.sudoers")
+sha256sums=('SKIP'
+            'SKIP')
+backup=(
+    'etc/sudoers.d/lazyvpn'
+)
+install=monarch-lazyvpn.install
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    # Install scripts to /usr/share/lazyvpn/bin
+    install -dm755 "$pkgdir/usr/share/lazyvpn/bin"
+    for script in bin/lazyvpn-*; do
+        install -Dm755 "$script" "$pkgdir/usr/share/lazyvpn/bin/$(basename "$script")"
+    done
+
+    # Create symlinks in /usr/bin for main commands
+    install -dm755 "$pkgdir/usr/bin"
+    for script in bin/lazyvpn-*; do
+        ln -s "/usr/share/lazyvpn/bin/$(basename "$script")" "$pkgdir/usr/bin/$(basename "$script")"
+    done
+
+    # Install sudoers configuration
+    install -dm750 "$pkgdir/etc/sudoers.d"
+    install -Dm440 "$srcdir/lazyvpn.sudoers" "$pkgdir/etc/sudoers.d/lazyvpn"
+
+    # Install license
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+    # Install documentation
+    install -Dm644 readme.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
