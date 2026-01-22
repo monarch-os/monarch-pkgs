@@ -2,20 +2,22 @@
 # Contributor: blank-query
 
 pkgname=monarch-lazyvpn
-pkgver=0.9.0
+pkgver=0.10.0
 pkgrel=1
 pkgdesc="WireGuard VPN manager for Monarch with systemd-networkd integration"
 arch=('any')
 url="https://github.com/monarch-os/monarch-lazyvpn"
 license=('MIT')
 depends=(
-    'wireguard-tools'
-    'curl'
     'bc'
-    'iptables'
     'bind'
-    'systemd'
+    'curl'
     'fzf'
+    'jq'
+    'jaq'
+    'iptables'
+    'systemd'
+    'wireguard-tools'
 )
 optdepends=(
     'hyprland: keyboard shortcuts support'
