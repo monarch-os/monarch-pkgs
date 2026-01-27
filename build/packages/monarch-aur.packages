@@ -13,6 +13,29 @@ sshm-bin
 waybackurls
 zsh-theme-powerlevel10k
 
+# for elephant
+elephant
+elephant-all
+elephant-archlinuxpkgs
+elephant-bitwarden
+elephant-bluetooth
+elephant-bookmarks
+elephant-calc
+elephant-clipboard
+elephant-desktopapplications
+elephant-files
+elephant-menus
+elephant-niriactions
+elephant-nirisessions
+elephant-providerlist
+elephant-runner
+elephant-symbols
+elephant-snippets
+elephant-todo
+elephant-unicode
+elephant-websearch
+elephant-windows
+
 
 # for posting
 python-click-default-group
