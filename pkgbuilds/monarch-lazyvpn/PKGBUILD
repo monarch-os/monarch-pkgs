@@ -2,7 +2,7 @@
 # Contributor: blank-query
 
 pkgname=monarch-lazyvpn
-pkgver=0.10.0
+pkgver=0.10.1
 pkgrel=1
 pkgdesc="WireGuard VPN manager for Monarch with systemd-networkd integration"
 arch=('any')
