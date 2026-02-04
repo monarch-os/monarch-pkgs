@@ -1,7 +1,7 @@
 # Maintainer: y0no <y0no@monarch.sh>
 
 pkgname=monarch-lazyvpn
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="TUI WireGuard multi-provider VPN manager"
 arch=('x86_64')
@@ -56,7 +56,8 @@ package() {
     install -Dm755 "target/release/monarch-lazyvpn-status" "$pkgdir/usr/bin/monarch-lazyvpn-status"
 
     # Install sudoers configuration
-    install -Dm440 "install/monarch-lazyvpn.sudoers" "$pkgdir/etc/sudoers.d/monarch-lazyvpn"
+    install -dm750 "$pkgdir/etc/sudoers.d"
+    install -m440 "install/monarch-lazyvpn.sudoers" "$pkgdir/etc/sudoers.d/monarch-lazyvpn"
 
     # Install polkit rules
     install -Dm644 "install/50-monarch-lazyvpn.rules" "$pkgdir/usr/share/polkit-1/rules.d/50-monarch-lazyvpn.rules"

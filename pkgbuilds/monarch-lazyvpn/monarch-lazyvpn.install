@@ -17,12 +17,12 @@ post_install() {
     echo "    \"format\": \"{}\","
     echo "    \"interval\": 5,"
     echo "    \"exec\": \"monarch-lazyvpn-status\","
-    echo "    \"on-click\": \"monarch-lazyvpn\""
+    echo "    \"on-click\": \"monarch-launch-floating-terminal-with-presentation monarch-lazyvpn\""
     echo "  }"
     echo ""
     echo "Keyboard shortcut (Hyprland):"
     echo "  Add to ~/.config/hypr/bindings.conf:"
-    echo "  bindd = SUPER, V, LazyVPN, exec, monarch-lazyvpn"
+    echo "  bindd = SUPER, V, LazyVPN, exec, monarch-launch-floating-terminal-with-presentation monarch-lazyvpn"
     echo ""
 }
 
