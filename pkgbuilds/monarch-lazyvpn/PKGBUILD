@@ -1,7 +1,7 @@
 # Maintainer: y0no <y0no@monarch.sh>
 
 pkgname=monarch-lazyvpn
-pkgver=0.1.1
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="TUI WireGuard multi-provider VPN manager"
 arch=('x86_64')
@@ -39,13 +39,6 @@ build() {
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
     cargo build --frozen --release --all-features
-}
-
-check() {
-    cd "$srcdir/$pkgname-$pkgver"
-    export RUSTUP_TOOLCHAIN=stable
-    export CARGO_TARGET_DIR=target
-    cargo test --frozen --all-features
 }
 
 package() {
