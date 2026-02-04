@@ -1,58 +1,66 @@
 # Maintainer: y0no <y0no@monarch.sh>
-# Contributor: blank-query
 
 pkgname=monarch-lazyvpn
-pkgver=0.10.1
+pkgver=0.1.0
 pkgrel=1
-pkgdesc="WireGuard VPN manager for Monarch with systemd-networkd integration"
-arch=('any')
+pkgdesc="TUI WireGuard multi-provider VPN manager"
+arch=('x86_64')
 url="https://github.com/monarch-os/monarch-lazyvpn"
 license=('MIT')
 depends=(
-    'bc'
-    'bind'
-    'curl'
-    'fzf'
-    'jq'
-    'jaq'
-    'iptables'
-    'systemd'
     'wireguard-tools'
+    'nftables'
+    'polkit'
+    'libsecret'
+)
+makedepends=(
+    'cargo'
+    'git'
 )
 optdepends=(
     'hyprland: keyboard shortcuts support'
+    'waybar: waybar integration'
 )
-source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v$pkgver"
-        "lazyvpn.sudoers")
-sha256sums=('SKIP'
-            'SKIP')
+source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v$pkgver")
+sha256sums=('SKIP')
 backup=(
-    'etc/sudoers.d/lazyvpn'
+    'etc/sudoers.d/monarch-lazyvpn'
 )
 install=monarch-lazyvpn.install
+
+prepare() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release --all-features
+}
+
+check() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo test --frozen --all-features
+}
 
 package() {
     cd "$srcdir/$pkgname-$pkgver"
 
-    # Install scripts to /usr/share/lazyvpn/bin
-    install -dm755 "$pkgdir/usr/share/lazyvpn/bin"
-    for script in bin/lazyvpn-*; do
-        install -Dm755 "$script" "$pkgdir/usr/share/lazyvpn/bin/$(basename "$script")"
-    done
-
-    # Create symlinks in /usr/bin for main commands
-    install -dm755 "$pkgdir/usr/bin"
-    for script in bin/lazyvpn-*; do
-        ln -s "/usr/share/lazyvpn/bin/$(basename "$script")" "$pkgdir/usr/bin/$(basename "$script")"
-    done
+    # Install binaries
+    install -Dm755 "target/release/monarch-lazyvpn" "$pkgdir/usr/bin/monarch-lazyvpn"
+    install -Dm755 "target/release/monarch-lazyvpn-status" "$pkgdir/usr/bin/monarch-lazyvpn-status"
 
     # Install sudoers configuration
-    install -dm750 "$pkgdir/etc/sudoers.d"
-    install -Dm440 "$srcdir/lazyvpn.sudoers" "$pkgdir/etc/sudoers.d/lazyvpn"
+    install -Dm440 "install/monarch-lazyvpn.sudoers" "$pkgdir/etc/sudoers.d/monarch-lazyvpn"
+
+    # Install polkit rules
+    install -Dm644 "install/50-monarch-lazyvpn.rules" "$pkgdir/usr/share/polkit-1/rules.d/50-monarch-lazyvpn.rules"
 
     # Install license
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-
-    # Install documentation
-    install -Dm644 readme.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

@@ -1,41 +1,28 @@
 post_install() {
     echo "==========================================="
-    echo "  LazyVPN installed successfully!"
+    echo "  monarch-lazyvpn installed successfully!"
     echo "==========================================="
     echo ""
-    echo "Required configuration:"
-    echo "  1. Make sure systemd-networkd is enabled:"
-    echo "     sudo systemctl enable --now systemd-networkd"
-    echo "     sudo systemctl enable --now systemd-resolved"
+    echo "Usage:"
+    echo "  monarch-lazyvpn          - Launch the TUI VPN manager"
+    echo "  monarch-lazyvpn-status   - Get current VPN status"
     echo ""
-    echo "  2. Initialize LazyVPN:"
-    echo "     lazyvpn-init"
-    echo ""
-    echo "  3. Add your WireGuard configs to:"
-    echo "     ~/.config/lazyvpn/wireguard/"
-    echo ""
-    echo "  4. Launch the LazyVPN menu:"
-    echo "     lazyvpn-menu"
-    echo ""
-    echo "Compatible VPN providers:"
-    echo "  - ProtonVPN, Mullvad, IVPN, or any WireGuard server"
-    echo ""
+    echo "Configuration files are stored in:"
+    echo "  ~/.config/monarch-lazyvpn/"
     echo ""
     echo "Waybar integration (optional):"
-    echo "  Add to "custom/lazyvpn" to on of your modules places ~/.config/waybar/config"
-    echo "  Add this as one of your module"
+    echo "  Add to your modules in ~/.config/waybar/config:"
     echo ""
     echo "  \"custom/lazyvpn\": {"
     echo "    \"format\": \"{}\","
     echo "    \"interval\": 5,"
-    echo "    \"return-type\": \"{}\","
-    echo "    \"exec\": \"lazyvpn-waybar-status\","
-    echo "    \"on-click\": \"lazyvpn-menu\""
-    echo "  },"
+    echo "    \"exec\": \"monarch-lazyvpn-status\","
+    echo "    \"on-click\": \"monarch-lazyvpn\""
+    echo "  }"
     echo ""
     echo "Keyboard shortcut (Hyprland):"
     echo "  Add to ~/.config/hypr/bindings.conf:"
-    echo "  bindd = SUPER, L, LazyVPN, exec, lazyvpn-menu"
+    echo "  bindd = SUPER, V, LazyVPN, exec, monarch-lazyvpn"
     echo ""
 }
 
@@ -43,22 +30,14 @@ post_upgrade() {
     post_install
 }
 
-pre_remove() {
-    echo "Disconnecting VPN if active..."
-    lazyvpn-disconnect 2>/dev/null || true
-
-    echo "Disabling killswitch..."
-    lazyvpn-disable-killswitch 2>/dev/null || true
-}
-
 post_remove() {
     echo ""
-    echo "LazyVPN uninstalled."
+    echo "monarch-lazyvpn uninstalled."
     echo ""
     echo "Configuration files remain in:"
-    echo "  ~/.config/lazyvpn/"
+    echo "  ~/.config/monarch-lazyvpn/"
     echo ""
     echo "To remove completely:"
-    echo "  rm -rf ~/.config/lazyvpn/"
+    echo "  rm -rf ~/.config/monarch-lazyvpn/"
     echo ""
 }
