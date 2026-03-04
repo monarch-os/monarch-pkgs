@@ -1,6 +1,6 @@
 # Maintainer: Yoann Ono Dit Biot <contact@y0no.fr>
 pkgname=monarch-nvim
-pkgver=2025.11.21
+pkgver=2026.2.26
 pkgrel=1
 pkgdesc="Pre-built LazyVim configuration with cached plugins"
 arch=('any')
@@ -8,7 +8,7 @@ url="https://github.com/LazyVim/LazyVim"
 license=('MIT')
 depends=('neovim>=0.9.0' 'git')
 makedepends=('git' 'nodejs' 'npm' 'tree-sitter-cli')
-conflicts=('omarchy-lazyvim' 'omarchy-nvim')
+conflicts=('omarchy-lazyvim')
 options=('!debug')
 source=("https://github.com/LazyVim/starter/archive/refs/heads/main.tar.gz")
 sha256sums=('d865d50211358358d3c3c1e356773c1e3de1e8964215d85eb1b4c77521e17488')
