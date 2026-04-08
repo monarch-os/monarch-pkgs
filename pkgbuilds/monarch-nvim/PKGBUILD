@@ -1,6 +1,6 @@
 # Maintainer: Yoann Ono Dit Biot <contact@y0no.fr>
 pkgname=monarch-nvim
-pkgver=2026.2.26
+pkgver=2026.4.8
 pkgrel=1
 pkgdesc="Pre-built LazyVim configuration with cached plugins"
 arch=('any')
