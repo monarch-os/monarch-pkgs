@@ -1,0 +1,26 @@
+post_install() {
+    cat <<'EOF'
+
+==> monzed installed.
+==> Run `monzed setup` (as your user) to install the monarch theme-set hook
+    and generate the initial Zed theme.
+
+    The hook lands at: ~/.config/monarch/hooks/theme-set.d/monzed
+    The Zed theme lands at: ~/.config/zed/themes/monzed.json
+
+EOF
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    cat <<'EOF'
+
+==> monzed removed. The per-user hook in ~/.config/monarch/hooks/theme-set.d/monzed
+    and the generated theme in ~/.config/zed/themes/monzed.json were left in place.
+    Remove them manually if you no longer want live theme sync.
+
+EOF
+}
