@@ -1,0 +1,26 @@
+# Maintainer: Yoann Ono (aur@y0no.fr)
+
+pkgname=monzed
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Live theme switching for Zed driven by Monarch (derived from omazed)"
+arch=('any')
+url="https://github.com/monarch-os/monzed"
+license=('MIT')
+depends=('bash' 'awk' 'sed' 'grep')
+optdepends=('zed: target editor whose theme is generated')
+makedepends=('git')
+source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monzed.git#tag=v$pkgver")
+sha256sums=('SKIP')
+install=$pkgname.install
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    install -Dm0755 monzed              "$pkgdir/usr/bin/monzed"
+    install -Dm0755 monzed-generator.sh "$pkgdir/usr/bin/monzed-generator.sh"
+    install -Dm0644 monzed-theme.tpl    "$pkgdir/usr/share/monzed/monzed-theme.tpl"
+    install -Dm0755 monzed-hook         "$pkgdir/usr/share/monzed/monzed-hook"
+    install -Dm0644 LICENSE             "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm0644 README.md           "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
