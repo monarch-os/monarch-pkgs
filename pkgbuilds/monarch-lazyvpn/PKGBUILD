@@ -1,7 +1,7 @@
 # Maintainer: y0no <y0no@monarch.sh>
 
 pkgname=monarch-lazyvpn
-pkgver=0.1.2
+pkgver=0.1.3
 pkgrel=1
 pkgdesc="TUI WireGuard multi-provider VPN manager"
 arch=('x86_64')
