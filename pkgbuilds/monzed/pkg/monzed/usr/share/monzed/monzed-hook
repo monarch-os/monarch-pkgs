@@ -1,4 +1,0 @@
-#!/bin/bash
-# monzed theme-set hook — regenerates the Zed theme each time monarch-theme-set runs.
-# Installed by `monzed setup` into ~/.config/monarch/hooks/theme-set.d/monzed.
-exec monzed set "$1"
