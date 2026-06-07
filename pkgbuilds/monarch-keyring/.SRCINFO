@@ -1,0 +1,18 @@
+pkgbase = monarch-keyring
+	pkgdesc = monarch keyring
+	pkgver = 20251028
+	pkgrel = 1
+	url = https://monarch-os.github.io
+	install = monarch-keyring.install
+	arch = any
+	license = GPL-3.0-or-later
+	source = monarch.gpg
+	source = monarch-revoked
+	source = monarch-trusted
+	source = monarch-keyring.install
+	sha512sums = 59206f316c7d56248276778b5d41ff21cdd331a9b3a19b5c812659aa302214fa8a417335e30c40ad57d9b94d1bc9613e3b19c3483d45382a6b08e0bbde49889b
+	sha512sums = cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+	sha512sums = 7ace274368931a8f632a572df25708eab3f1ad9013b9ddb99e5de4a885d0f9780b0b0bba619684634502a1664cbb3472333cf6adbf56d3da083387a8bb9f0fbd
+	sha512sums = b03c9f84b7fea7004ddb5349fd004fcd1e78d3e73a13a996940ecded94604312f894791a8930af612f60bc104b6f157d2448a5e36b06a8cb49cb8b0aafb983e2
+
+pkgname = monarch-keyring
