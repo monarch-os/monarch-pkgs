@@ -30,7 +30,7 @@ qmk-hid
 symfony-cli
 visual-studio-code-bin
 voxtype-bin
-yt6801-dkms
+v4l2-relayd
 
 # for elephant
 elephant
