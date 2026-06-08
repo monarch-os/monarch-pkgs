@@ -16,6 +16,12 @@ zsh-theme-powerlevel10k
 # for omarchy removal
 macbook12-spi-driver-dkms
 tuxedo-drivers-nocompatcheck-dkms
+tzupdate
+ufw-docker
+xdg-terminal-exec
+python-terminaltexteffects
+yaru-icon-theme
+try-rs-bin
 
 # for elephant
 elephant
