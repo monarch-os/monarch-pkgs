@@ -11,6 +11,16 @@ FINAL_OUTPUT_DIR="/pkgs.monarchlinux.com/$ARCH"
 
 mkdir -p "$BUILD_OUTPUT_DIR" "$FINAL_OUTPUT_DIR"
 
+# makepkg -s installs missing deps with a stock pacman that defaults conflict
+# replacement prompts to 'N' and aborts. build_package runs makepkg with
+# PACMAN pointed at an --ask 4 wrapper. The Dockerfile bakes that wrapper in for
+# bin/build; create it here too so build.sh also works when run directly in a
+# bare container (e.g. the nightly CI), where the Dockerfile isn't used.
+if [[ ! -x /usr/local/bin/pacman-for-makepkg ]]; then
+  printf '#!/bin/bash\nexec /usr/bin/pacman --ask 4 "$@"\n' | sudo tee /usr/local/bin/pacman-for-makepkg >/dev/null
+  sudo chmod +x /usr/local/bin/pacman-for-makepkg
+fi
+
 # Configure Monarch repositories for dependency resolution
 echo "==> Configuring Monarch repositories for dependency resolution..."
 
