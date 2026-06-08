@@ -1,1 +1,4 @@
-{"source":"aur"}
+{
+  "source": "aur",
+  "upstream_commit": "bccf5b407c9dfd64dd80a9b77405aa25184fbad5"
+}
