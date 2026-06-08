@@ -13,6 +13,10 @@ sshm-bin
 waybackurls
 zsh-theme-powerlevel10k
 
+# for omarchy removal
+macbook12-spi-driver-dkms
+tuxedo-drivers-nocompatcheck-dkms
+
 # for elephant
 elephant
 elephant-all
