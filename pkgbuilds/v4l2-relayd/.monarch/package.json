@@ -1,0 +1,7 @@
+{
+  "source": "aur",
+  "pkgrel": {
+    "suffix": 1,
+    "offset": 1
+  }
+}
