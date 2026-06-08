@@ -42,8 +42,8 @@ while [[ $# -gt 0 ]]; do
     echo "  --package <names>    Build only the specified package(s) (space-separated)"
     echo "  -h, --help           Show this help message"
     echo ""
-    echo "This script builds AUR packages from:"
-    echo "  build/packages/monarch-aur.packages"
+    echo "This script builds every package under pkgbuilds/ (AUR sync and"
+    echo "  build selection are driven by each package's .monarch/package.json)."
     echo ""
     echo "Or build a single package with --package:"
     echo "  Package can be: AUR package, GitHub repo (owner/repo), or local PKGBUILD"
@@ -73,13 +73,7 @@ print_info "Cleaning build workspace..."
 rm -rf "$BUILD_OUTPUT_DIR"/*
 mkdir -p "$BUILD_OUTPUT_DIR"
 
-# Check if AUR package list exists (only required if not building specific packages)
-if [[ -z "$PACKAGES" ]]; then
-  if [[ ! -f "$BUILD_DIR/packages/monarch-aur.packages" ]]; then
-    print_error "monarch-aur.packages not found at $BUILD_DIR/packages/"
-    exit 1
-  fi
-else
+if [[ -n "$PACKAGES" ]]; then
   print_info "Building packages: $PACKAGES"
 fi
 
