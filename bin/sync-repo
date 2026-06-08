@@ -65,15 +65,17 @@ print_info "Syncing to: $REMOTE/$DESTINATION_DIRECTORY"
 # Use --ignore-existing to not overwrite different versions already on remote
 print_info "Syncing packages..."
 rclone sync "$DIRECTORY" "$REMOTE/$DESTINATION_DIRECTORY" \
-  --exclude "monarc.db*" \
+  --exclude "monarch.db*" \
   --exclude "monarch.files*" \
   --ignore-existing \
+  --s3-no-head \
   --copy-links --delete-after -v
 
 # Then sync database files last to ensure repository integrity
 print_info "Updating repository database..."
 rclone copy "$DIRECTORY" "$REMOTE/$DESTINATION_DIRECTORY/" \
   --include "monarch.*" \
+  --s3-no-head \
   --checksum --copy-links -v
 
 print_success "sync complete!"

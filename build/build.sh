@@ -62,15 +62,60 @@ FAILED_PACKAGES=""
 SUCCESSFUL_PACKAGES=""
 SKIPPED_PACKAGES=""
 
-# Get version from final output (production packages)
+# Source package directories are named after the PKGBUILD pkgbase, but split
+# packages are stored in the repo DB under their individual pkgname entries.
+# Cache versions by both %NAME% and %BASE% so a pkgbase like `yaru` is found
+# even though the DB only contains packages like `yaru-icon-theme`.
+declare -A LOCAL_VERSION_BY_NAME=()
+declare -A LOCAL_VERSION_BY_BASE=()
+LOCAL_VERSION_CACHE_LOADED=false
+LOCAL_VERSION_CACHE_DB=""
+
+load_local_versions() {
+  local db="$FINAL_OUTPUT_DIR/monarch.db.tar.zst"
+
+  if [[ ! -f "$db" ]]; then
+    db="$FINAL_OUTPUT_DIR/monarch.db"
+  fi
+
+  [[ -f "$db" ]] || return 0
+  [[ "$LOCAL_VERSION_CACHE_LOADED" == true && "$LOCAL_VERSION_CACHE_DB" == "$db" ]] && return 0
+
+  LOCAL_VERSION_BY_NAME=()
+  LOCAL_VERSION_BY_BASE=()
+
+  local name base version
+  while IFS=$'\t' read -r name base version; do
+    [[ -n "$name" && -n "$version" ]] && LOCAL_VERSION_BY_NAME["$name"]="$version"
+    [[ -n "$base" && -n "$version" ]] && LOCAL_VERSION_BY_BASE["$base"]="$version"
+  done < <(
+    tar -xOf "$db" --wildcards '*/desc' 2>/dev/null | awk '
+      function emit() {
+        if (name != "" && version != "") print name "\t" base "\t" version
+        name=""; base=""; version=""
+      }
+      $0 == "%FILENAME%" { emit(); next }
+      $0 == "%NAME%" { if (name != "" && version != "") emit(); getline; name=$0; next }
+      $0 == "%BASE%" { getline; base=$0; next }
+      $0 == "%VERSION%" { getline; version=$0; next }
+      END { emit() }
+    '
+  )
+
+  LOCAL_VERSION_CACHE_LOADED=true
+  LOCAL_VERSION_CACHE_DB="$db"
+}
+
+# Get version from final output (production packages), by pkgname or pkgbase.
 get_local_version() {
   local pkg="$1"
-  if [[ -f "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" ]]; then
-    local desc_file=$(tar -tf "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" | grep "^${pkg}-[0-9r].*/desc$" | head -1)
-    if [[ -n "$desc_file" ]]; then
-      tar -xOf "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" "$desc_file" 2>/dev/null |
-        awk '/%VERSION%/{getline; print; exit}'
-    fi
+
+  load_local_versions
+
+  if [[ -n "${LOCAL_VERSION_BY_NAME[$pkg]:-}" ]]; then
+    echo "${LOCAL_VERSION_BY_NAME[$pkg]}"
+  elif [[ -n "${LOCAL_VERSION_BY_BASE[$pkg]:-}" ]]; then
+    echo "${LOCAL_VERSION_BY_BASE[$pkg]}"
   fi
 }
 
@@ -124,10 +169,12 @@ build_package() {
     done
   fi
   
-  # Build package without signing (signing is done separately)
+  # Build package without signing (signing is done separately).
+  # PACMAN= points makepkg's dep install at the --ask 4 wrapper so conflict
+  # replacement prompts are auto-accepted instead of aborting the build.
   MAKEPKG_FLAGS="-scf --noconfirm"
-  
-  if makepkg $MAKEPKG_FLAGS; then
+
+  if PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
     done
@@ -178,41 +225,6 @@ get_package_deps() {
       echo "$dep"
     fi
   done
-}
-
-# Simple dependency-aware build order
-# Build packages with no internal deps first, then those that depend on them
-build_order() {
-  local -a all_packages=()
-  local -a result=()
-  local -A package_deps_count=()
-  
-  # Collect all packages
-  for pkgdir in /pkgbuilds/*/; do
-    [[ ! -d "$pkgdir" ]] && continue
-    local pkg=$(basename "$pkgdir")
-    [[ ! -f "$pkgdir/PKGBUILD" ]] && continue
-    all_packages+=("$pkg")
-    
-    # Count internal dependencies
-    local dep_count=0
-    while read -r dep; do
-      ((dep_count++))
-    done < <(get_package_deps "$pkg")
-    package_deps_count[$pkg]=$dep_count
-  done
-  
-  # Sort: packages with fewer deps first
-  while IFS= read -r pkg; do
-    result+=("$pkg")
-  done < <(
-    for pkg in "${all_packages[@]}"; do
-      echo "${package_deps_count[$pkg]} $pkg"
-    done | sort -n | cut -d' ' -f2-
-  )
-  
-  # Output in build order
-  printf '%s\n' "${result[@]}"
 }
 
 # Check which packages need building (version check only)
