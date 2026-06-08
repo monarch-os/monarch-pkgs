@@ -104,6 +104,16 @@ build_package() {
     echo "    New package (version: $pkgbuild_version)"
   fi
   
+  # Import PGP keys the PKGBUILD declares in validpgpkeys, so signed sources
+  # verify without hand-maintaining each key in build/gpg-keys.txt.
+  local pgp_keys=$(bash -c 'source PKGBUILD 2>/dev/null; echo "${validpgpkeys[@]}"')
+  if [[ -n "$pgp_keys" ]]; then
+    echo "    Importing PGP keys from validpgpkeys..."
+    for key in $pgp_keys; do
+      gpg --receive-keys "$key" 2>/dev/null && echo "      ✓ Received $key" || echo "      ⚠ Failed to receive $key"
+    done
+  fi
+
   # Import package-specific PGP keys if they exist
   if [[ -d "keys/pgp" ]]; then
     echo "    Importing package-specific PGP keys..."
