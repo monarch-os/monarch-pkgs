@@ -71,38 +71,38 @@ package_yaru-sound-theme() {
 }
 
 package_yaru-gtk-theme() {
-  pkgdesc="Yaru default ubuntu gtk theme"
+  pkgdesc="Yaru default ubuntu gtk theme"  
   depends=("gtk3" "gdk-pixbuf2" "gtk-engine-murrine" "gnome-themes-extra")
-
+  
   DESTDIR="$pkgdir" ninja -C build install 2>&1 >> install.log
   _delete_all_from_pkgdir_except "gtk-theme"
 }
 
 package_yaru-gtksourceview-theme() {
   pkgdesc="Yaru default ubuntu gtksourceview theme"
-
+  
   DESTDIR="$pkgdir" ninja -C build install 2>&1 >> install.log
   _delete_all_from_pkgdir_except "gtksourceview-theme"
 }
 
 package_yaru-gnome-shell-theme() {
-  pkgdesc="Yaru default ubuntu gnome shell theme"
+  pkgdesc="Yaru default ubuntu gnome shell theme"  
   depends=("gnome-shell")
-
+  
   DESTDIR="$pkgdir" ninja -C build install 2>&1 >> install.log
   _delete_all_from_pkgdir_except "gnome-shell-theme"
 }
 
 package_yaru-xfwm4-theme() {
-  pkgdesc="Yaru default ubuntu xfwm4 theme"
-
+  pkgdesc="Yaru default ubuntu xfwm4 theme"  
+  
   DESTDIR="$pkgdir" ninja -C build install 2>&1 >> install.log
   _delete_all_from_pkgdir_except "xfwm4-theme"
 }
 
 package_yaru-unity-theme() {
   pkgdesc="Yaru default ubuntu unity theme"
-
+  
   DESTDIR="$pkgdir" ninja -C build install 2>&1 >> install.log
   _delete_all_from_pkgdir_except "unity-theme"
 }
@@ -116,7 +116,7 @@ package_yaru-metacity-theme() {
 }
 
 package_yaru-icon-theme() {
-  pkgdesc="Yaru default ubuntu icon theme"
+  pkgdesc="Yaru default ubuntu icon theme"  
   depends=("hicolor-icon-theme" "gtk-update-icon-cache" "librsvg")
 
   DESTDIR="$pkgdir" ninja -C build install 2>&1 >> install.log

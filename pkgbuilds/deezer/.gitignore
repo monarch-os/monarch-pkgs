@@ -1,6 +1,0 @@
-pkg
-src
-deezer-*.exe
-*.tgz
-*.patch
-!99-*.patch

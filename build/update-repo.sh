@@ -21,25 +21,43 @@ if ! ls *.pkg.tar.* 1>/dev/null 2>&1; then
   exit 1
 fi
 
-# Add all packages to the database (only latest version of each)
+# Add all packages to the database (only the latest version of each).
+# Read each package's .PKGINFO with bsdtar for the real pkgname/pkgver and pick
+# the highest version with vercmp. Robust for split packages and names that
+# contain digits/dashes (the old ls -t + dash-stripping awk got both wrong).
 echo "==> Adding packages to database..."
-ls -t *.pkg.tar.* 2>/dev/null | grep -v '\.sig$' | awk '
-{
-  # Extract package name without version-rel-arch.pkg.tar.ext
-  pkgfile = $0
-  gsub(/\.pkg\.tar\.(zst|xz|gz)$/, "", pkgfile)
-  split(pkgfile, parts, "-")
-  # Rebuild name without last 3 parts (version-rel-arch)
-  pkgname = parts[1]
-  for (i = 2; i <= length(parts) - 3; i++) {
-    pkgname = pkgname "-" parts[i]
-  }
-  
-  if (!seen[pkgname]++) {
-    print $0
-  }
+
+declare -A latest_pkgs
+declare -A latest_vers
+
+get_pkg_info() {
+  local pkg="$1"
+  bsdtar -xOqf "$pkg" .PKGINFO 2>/dev/null | awk '
+    /^pkgname = / { name = substr($0, 11) }
+    /^pkgver = / { ver = substr($0, 10) }
+    END { print name " " ver }
+  '
 }
-' | xargs repo-add "$DB_FILE" || {
+
+for pkg in *.pkg.tar.*; do
+  [[ "$pkg" == *.sig ]] && continue
+  [[ ! -f "$pkg" ]] && continue
+
+  read -r name ver <<< "$(get_pkg_info "$pkg")"
+  [[ -z "$name" ]] && continue
+
+  if [[ -z "${latest_pkgs[$name]}" ]]; then
+    latest_pkgs[$name]="$pkg"
+    latest_vers[$name]="$ver"
+  else
+    if [[ $(vercmp "$ver" "${latest_vers[$name]}") -gt 0 ]]; then
+      latest_pkgs[$name]="$pkg"
+      latest_vers[$name]="$ver"
+    fi
+  fi
+done
+
+repo-add "$DB_FILE" "${latest_pkgs[@]}" || {
   echo "==> Failed to update repository database"
   exit 1
 }

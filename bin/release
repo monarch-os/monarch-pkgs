@@ -65,7 +65,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo ""
-print_info "Target architecture: $ARCH"S
+print_info "Target architecture: $ARCH"
 print_info "Build workspace: $BUILD_OUTPUT_DIR"
 
 # Step 1: Build

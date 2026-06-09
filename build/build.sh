@@ -11,6 +11,29 @@ FINAL_OUTPUT_DIR="/pkgs.monarchlinux.com/$ARCH"
 
 mkdir -p "$BUILD_OUTPUT_DIR" "$FINAL_OUTPUT_DIR"
 
+# makepkg -s installs missing deps with a stock pacman that defaults conflict
+# replacement prompts to 'N' and aborts. build_package runs makepkg with
+# PACMAN pointed at an --ask 4 wrapper. The Dockerfile bakes that wrapper in for
+# bin/build; create it here too so build.sh also works when run directly in a
+# bare container (e.g. the nightly CI), where the Dockerfile isn't used.
+if [[ ! -x /usr/local/bin/pacman-for-makepkg ]]; then
+  printf '#!/bin/bash\nexec /usr/bin/pacman --ask 4 "$@"\n' | sudo tee /usr/local/bin/pacman-for-makepkg >/dev/null
+  sudo chmod +x /usr/local/bin/pacman-for-makepkg
+fi
+
+# Source the package-metadata helper (used by the VCS rebuild-skip). Resolve it
+# from this script's location so it works both in bin/build's container
+# (/build/build.sh -> /helpers, mounted by bin/build) and when build.sh is run
+# directly from the repo (build/build.sh -> ../helpers, e.g. the nightly CI).
+HELPERS_DIR="${HELPERS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../helpers" 2>/dev/null && pwd)}"
+if [[ -n "$HELPERS_DIR" && -f "$HELPERS_DIR/package-metadata.sh" ]]; then
+  source "$HELPERS_DIR/package-metadata.sh"
+  METADATA_HELPERS=true
+else
+  METADATA_HELPERS=false
+  echo "==> WARNING: package-metadata.sh not found; VCS rebuild-skip disabled"
+fi
+
 # Configure Monarch repositories for dependency resolution
 echo "==> Configuring Monarch repositories for dependency resolution..."
 
@@ -62,15 +85,60 @@ FAILED_PACKAGES=""
 SUCCESSFUL_PACKAGES=""
 SKIPPED_PACKAGES=""
 
-# Get version from final output (production packages)
+# Source package directories are named after the PKGBUILD pkgbase, but split
+# packages are stored in the repo DB under their individual pkgname entries.
+# Cache versions by both %NAME% and %BASE% so a pkgbase like `yaru` is found
+# even though the DB only contains packages like `yaru-icon-theme`.
+declare -A LOCAL_VERSION_BY_NAME=()
+declare -A LOCAL_VERSION_BY_BASE=()
+LOCAL_VERSION_CACHE_LOADED=false
+LOCAL_VERSION_CACHE_DB=""
+
+load_local_versions() {
+  local db="$FINAL_OUTPUT_DIR/monarch.db.tar.zst"
+
+  if [[ ! -f "$db" ]]; then
+    db="$FINAL_OUTPUT_DIR/monarch.db"
+  fi
+
+  [[ -f "$db" ]] || return 0
+  [[ "$LOCAL_VERSION_CACHE_LOADED" == true && "$LOCAL_VERSION_CACHE_DB" == "$db" ]] && return 0
+
+  LOCAL_VERSION_BY_NAME=()
+  LOCAL_VERSION_BY_BASE=()
+
+  local name base version
+  while IFS=$'\t' read -r name base version; do
+    [[ -n "$name" && -n "$version" ]] && LOCAL_VERSION_BY_NAME["$name"]="$version"
+    [[ -n "$base" && -n "$version" ]] && LOCAL_VERSION_BY_BASE["$base"]="$version"
+  done < <(
+    tar -xOf "$db" --wildcards '*/desc' 2>/dev/null | awk '
+      function emit() {
+        if (name != "" && version != "") print name "\t" base "\t" version
+        name=""; base=""; version=""
+      }
+      $0 == "%FILENAME%" { emit(); next }
+      $0 == "%NAME%" { if (name != "" && version != "") emit(); getline; name=$0; next }
+      $0 == "%BASE%" { getline; base=$0; next }
+      $0 == "%VERSION%" { getline; version=$0; next }
+      END { emit() }
+    '
+  )
+
+  LOCAL_VERSION_CACHE_LOADED=true
+  LOCAL_VERSION_CACHE_DB="$db"
+}
+
+# Get version from final output (production packages), by pkgname or pkgbase.
 get_local_version() {
   local pkg="$1"
-  if [[ -f "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" ]]; then
-    local desc_file=$(tar -tf "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" | grep "^${pkg}-[0-9r].*/desc$" | head -1)
-    if [[ -n "$desc_file" ]]; then
-      tar -xOf "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" "$desc_file" 2>/dev/null |
-        awk '/%VERSION%/{getline; print; exit}'
-    fi
+
+  load_local_versions
+
+  if [[ -n "${LOCAL_VERSION_BY_NAME[$pkg]:-}" ]]; then
+    echo "${LOCAL_VERSION_BY_NAME[$pkg]}"
+  elif [[ -n "${LOCAL_VERSION_BY_BASE[$pkg]:-}" ]]; then
+    echo "${LOCAL_VERSION_BY_BASE[$pkg]}"
   fi
 }
 
@@ -124,10 +192,12 @@ build_package() {
     done
   fi
   
-  # Build package without signing (signing is done separately)
+  # Build package without signing (signing is done separately).
+  # PACMAN= points makepkg's dep install at the --ask 4 wrapper so conflict
+  # replacement prompts are auto-accepted instead of aborting the build.
   MAKEPKG_FLAGS="-scf --noconfirm"
-  
-  if makepkg $MAKEPKG_FLAGS; then
+
+  if PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
     done
@@ -180,55 +250,72 @@ get_package_deps() {
   done
 }
 
-# Simple dependency-aware build order
-# Build packages with no internal deps first, then those that depend on them
-build_order() {
-  local -a all_packages=()
-  local -a result=()
-  local -A package_deps_count=()
-  
-  # Collect all packages
-  for pkgdir in /pkgbuilds/*/; do
-    [[ ! -d "$pkgdir" ]] && continue
-    local pkg=$(basename "$pkgdir")
-    [[ ! -f "$pkgdir/PKGBUILD" ]] && continue
-    all_packages+=("$pkg")
-    
-    # Count internal dependencies
-    local dep_count=0
-    while read -r dep; do
-      ((dep_count++))
-    done < <(get_package_deps "$pkg")
-    package_deps_count[$pkg]=$dep_count
-  done
-  
-  # Sort: packages with fewer deps first
-  while IFS= read -r pkg; do
-    result+=("$pkg")
-  done < <(
-    for pkg in "${all_packages[@]}"; do
-      echo "${package_deps_count[$pkg]} $pkg"
-    done | sort -n | cut -d' ' -f2-
-  )
-  
-  # Output in build order
-  printf '%s\n' "${result[@]}"
+# For a VCS package (pkgver()), the static pkgver in the PKGBUILD is stale, so a
+# plain version compare always says "build" — it then rebuilds and collides with
+# the identical version already in production. Instead, compare the commit hash
+# baked into the published version against the current upstream git ref, and
+# skip when they match (unless pkgrel/epoch changed).
+check_vcs_unchanged() {
+  local pkg="$1"
+  local pkgdir="/pkgbuilds/$pkg"
+  local pkgbuild="$pkgdir/PKGBUILD"
+
+  grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild" || return 1
+
+  local local_version=$(get_local_version "$pkg")
+  [[ -z "$local_version" ]] && return 1
+
+  local pkgbuild_epoch=$(cd "$pkgdir" && bash -c 'source PKGBUILD 2>/dev/null; echo "${epoch:-}"')
+  local pkgbuild_pkgrel=$(cd "$pkgdir" && bash -c 'source PKGBUILD 2>/dev/null; echo "${pkgrel}"')
+
+  local prod_pkgrel="${local_version##*-}"
+  local prod_no_pkgrel="${local_version%-*}"
+  local prod_epoch=""
+  if [[ "$prod_no_pkgrel" == *:* ]]; then
+    prod_epoch="${prod_no_pkgrel%%:*}"
+  fi
+
+  [[ "$pkgbuild_epoch" != "$prod_epoch" ]] && return 1
+  [[ "$pkgbuild_pkgrel" != "$prod_pkgrel" ]] && return 1
+
+  local prod_hash=$(package_extract_vcs_hash_from_version "$local_version")
+  [[ -z "$prod_hash" ]] && return 1
+
+  local upstream_hash=$(package_git_upstream_hash "$pkgdir")
+  [[ -z "$upstream_hash" ]] && return 1
+
+  [[ "$prod_hash" == "$upstream_hash" ]]
 }
 
 # Check which packages need building (version check only)
 check_needs_build() {
   local pkg="$1"
   local pkgbuild="/pkgbuilds/$pkg/PKGBUILD"
-  
+
   [[ ! -f "$pkgbuild" ]] && return 1
-  
+
   # Get PKGBUILD version (including epoch if present)
   local pkgbuild_version=$(cd "/pkgbuilds/$pkg" && bash -c 'source PKGBUILD; if [[ -n "$epoch" ]]; then echo "${epoch}:${pkgver}-${pkgrel}"; else echo "${pkgver}-${pkgrel}"; fi' 2>/dev/null)
   [[ -z "$pkgbuild_version" ]] && return 1
-  
+
   # Check if already built
   local local_version=$(get_local_version "$pkg")
-  
+
+  # VCS-aware path (only when the metadata helper is available).
+  if [[ "$METADATA_HELPERS" == true ]] && grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild"; then
+    if [[ -n "$local_version" && -n "$(package_extract_vcs_hash_from_version "$local_version")" ]]; then
+      if check_vcs_unchanged "$pkg"; then
+        return 1  # upstream ref already represented in the repo
+      else
+        return 0  # new ref, missing repo package, or pkgrel/epoch changed
+      fi
+    elif [[ "$local_version" == "$pkgbuild_version" ]]; then
+      return 1  # VCS package without a hash; fall back to static version
+    else
+      return 0
+    fi
+  fi
+
   if [[ "$local_version" == "$pkgbuild_version" ]]; then
     return 1  # Already up to date
   else
