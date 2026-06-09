@@ -94,6 +94,7 @@ DOCKER_ARGS=(
   -v "$BUILD_ROOT/build-output:/build-output"
   -v "$BUILD_ROOT/pkgs.monarchlinux.com:/pkgs.monarchlinux.com"
   -v "$BUILD_DIR:/build:ro"
+  -v "$BUILD_ROOT/helpers:/helpers:ro"
   -v "$BUILD_ROOT/pkgbuilds:/pkgbuilds:ro"
 )
 

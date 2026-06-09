@@ -21,6 +21,19 @@ if [[ ! -x /usr/local/bin/pacman-for-makepkg ]]; then
   sudo chmod +x /usr/local/bin/pacman-for-makepkg
 fi
 
+# Source the package-metadata helper (used by the VCS rebuild-skip). Resolve it
+# from this script's location so it works both in bin/build's container
+# (/build/build.sh -> /helpers, mounted by bin/build) and when build.sh is run
+# directly from the repo (build/build.sh -> ../helpers, e.g. the nightly CI).
+HELPERS_DIR="${HELPERS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../helpers" 2>/dev/null && pwd)}"
+if [[ -n "$HELPERS_DIR" && -f "$HELPERS_DIR/package-metadata.sh" ]]; then
+  source "$HELPERS_DIR/package-metadata.sh"
+  METADATA_HELPERS=true
+else
+  METADATA_HELPERS=false
+  echo "==> WARNING: package-metadata.sh not found; VCS rebuild-skip disabled"
+fi
+
 # Configure Monarch repositories for dependency resolution
 echo "==> Configuring Monarch repositories for dependency resolution..."
 
@@ -237,20 +250,72 @@ get_package_deps() {
   done
 }
 
+# For a VCS package (pkgver()), the static pkgver in the PKGBUILD is stale, so a
+# plain version compare always says "build" — it then rebuilds and collides with
+# the identical version already in production. Instead, compare the commit hash
+# baked into the published version against the current upstream git ref, and
+# skip when they match (unless pkgrel/epoch changed).
+check_vcs_unchanged() {
+  local pkg="$1"
+  local pkgdir="/pkgbuilds/$pkg"
+  local pkgbuild="$pkgdir/PKGBUILD"
+
+  grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild" || return 1
+
+  local local_version=$(get_local_version "$pkg")
+  [[ -z "$local_version" ]] && return 1
+
+  local pkgbuild_epoch=$(cd "$pkgdir" && bash -c 'source PKGBUILD 2>/dev/null; echo "${epoch:-}"')
+  local pkgbuild_pkgrel=$(cd "$pkgdir" && bash -c 'source PKGBUILD 2>/dev/null; echo "${pkgrel}"')
+
+  local prod_pkgrel="${local_version##*-}"
+  local prod_no_pkgrel="${local_version%-*}"
+  local prod_epoch=""
+  if [[ "$prod_no_pkgrel" == *:* ]]; then
+    prod_epoch="${prod_no_pkgrel%%:*}"
+  fi
+
+  [[ "$pkgbuild_epoch" != "$prod_epoch" ]] && return 1
+  [[ "$pkgbuild_pkgrel" != "$prod_pkgrel" ]] && return 1
+
+  local prod_hash=$(package_extract_vcs_hash_from_version "$local_version")
+  [[ -z "$prod_hash" ]] && return 1
+
+  local upstream_hash=$(package_git_upstream_hash "$pkgdir")
+  [[ -z "$upstream_hash" ]] && return 1
+
+  [[ "$prod_hash" == "$upstream_hash" ]]
+}
+
 # Check which packages need building (version check only)
 check_needs_build() {
   local pkg="$1"
   local pkgbuild="/pkgbuilds/$pkg/PKGBUILD"
-  
+
   [[ ! -f "$pkgbuild" ]] && return 1
-  
+
   # Get PKGBUILD version (including epoch if present)
   local pkgbuild_version=$(cd "/pkgbuilds/$pkg" && bash -c 'source PKGBUILD; if [[ -n "$epoch" ]]; then echo "${epoch}:${pkgver}-${pkgrel}"; else echo "${pkgver}-${pkgrel}"; fi' 2>/dev/null)
   [[ -z "$pkgbuild_version" ]] && return 1
-  
+
   # Check if already built
   local local_version=$(get_local_version "$pkg")
-  
+
+  # VCS-aware path (only when the metadata helper is available).
+  if [[ "$METADATA_HELPERS" == true ]] && grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild"; then
+    if [[ -n "$local_version" && -n "$(package_extract_vcs_hash_from_version "$local_version")" ]]; then
+      if check_vcs_unchanged "$pkg"; then
+        return 1  # upstream ref already represented in the repo
+      else
+        return 0  # new ref, missing repo package, or pkgrel/epoch changed
+      fi
+    elif [[ "$local_version" == "$pkgbuild_version" ]]; then
+      return 1  # VCS package without a hash; fall back to static version
+    else
+      return 0
+    fi
+  fi
+
   if [[ "$local_version" == "$pkgbuild_version" ]]; then
     return 1  # Already up to date
   else
