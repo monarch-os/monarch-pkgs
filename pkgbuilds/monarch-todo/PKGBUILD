@@ -1,0 +1,42 @@
+# Maintainer: y0no <y0no@monarch.sh>
+
+pkgname=monarch-todo
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Fast TUI/CLI todo manager for Monarch"
+arch=('x86_64')
+url="https://github.com/monarch-os/monarch-todo"
+license=('MIT')
+makedepends=(
+    'cargo'
+    'git'
+)
+optdepends=(
+    'monarch: reminders, the Mod+T launcher and the Noctalia bar widget'
+)
+source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-todo.git#tag=v$pkgver")
+sha256sums=('SKIP')
+install=monarch-todo.install
+
+prepare() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    # Single binary: bare = TUI, subcommands = CLI.
+    install -Dm755 "target/release/monarch-todo" "$pkgdir/usr/bin/monarch-todo"
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

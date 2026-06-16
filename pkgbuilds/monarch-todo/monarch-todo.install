@@ -1,0 +1,28 @@
+post_install() {
+    echo "==========================================="
+    echo "  monarch-todo installed successfully!"
+    echo "==========================================="
+    echo ""
+    echo "Usage:"
+    echo "  monarch-todo                 - Launch the TUI"
+    echo "  monarch-todo add \"...\"        - CLI (add/list/done/status/set/rm/clear)"
+    echo "  monarch-todo --help          - All commands ('?' in the TUI for keys)"
+    echo ""
+    echo "Store (shared with the rest of Monarch):"
+    echo "  \${MONARCH_TODO_FILE:-~/.local/state/monarch/todo.json}"
+    echo ""
+    echo "Desktop integration (app menu, Mod+T, bar widget) is wired by:"
+    echo "  monarch install todo"
+    echo ""
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    echo ""
+    echo "monarch-todo uninstalled. Your task store is left untouched."
+    echo "Remove desktop integration with: monarch remove todo"
+    echo ""
+}
