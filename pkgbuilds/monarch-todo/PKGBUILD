@@ -1,7 +1,7 @@
 # Maintainer: y0no <y0no@monarch.sh>
 
 pkgname=monarch-todo
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Fast TUI/CLI todo manager for Monarch"
 arch=('x86_64')
