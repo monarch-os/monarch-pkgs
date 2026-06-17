@@ -24,10 +24,10 @@ RUN apk add --no-cache \
 RUN case "${TARGETARCH}" in \
     amd64) \
         echo "x86_64" > /tmp/arch && \
-        printf '[core]\nInclude = /etc/pacman.d/mirrorlist\n\n[extra]\nInclude = /etc/pacman.d/mirrorlist\n' > /tmp/repos.conf ;; \
+        printf '[core]\nSigLevel = Required DatabaseOptional\nInclude = /etc/pacman.d/mirrorlist\n\n[extra]\nSigLevel = Required DatabaseOptional\nInclude = /etc/pacman.d/mirrorlist\n' > /tmp/repos.conf ;; \
     arm64) \
         echo "aarch64" > /tmp/arch && \
-        printf '[core]\nInclude = /etc/pacman.d/mirrorlist\n\n[extra]\nInclude = /etc/pacman.d/mirrorlist\n\n[alarm]\nInclude = /etc/pacman.d/mirrorlist\n\n[aur]\nInclude = /etc/pacman.d/mirrorlist\n' > /tmp/repos.conf ;; \
+        printf '[core]\nSigLevel = Required DatabaseOptional\nInclude = /etc/pacman.d/mirrorlist\n\n[extra]\nSigLevel = Required DatabaseOptional\nInclude = /etc/pacman.d/mirrorlist\n\n[alarm]\nSigLevel = Required DatabaseOptional\nInclude = /etc/pacman.d/mirrorlist\n\n[aur]\nSigLevel = Required DatabaseOptional\nInclude = /etc/pacman.d/mirrorlist\n' > /tmp/repos.conf ;; \
     *) \
         echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac
@@ -36,7 +36,7 @@ RUN mkdir -p /etc/pacman.d && \
     cat /tmp/repos.conf >> /etc/pacman.conf
 
 RUN if [ "${TARGETARCH}" = "amd64" ]; then \
-        printf 'Server = https://mirror.omarchy.org/$repo/os/$arch\nServer = https://mirror.rackspace.com/archlinux/$repo/os/$arch\nServer = https://geo.mirror.pkgbuild.com/$repo/os/$arch\n' > /etc/pacman.d/mirrorlist; \
+        printf 'Server = https://archlinux.cachyos.org/repo/$repo/os/$arch\nServer = https://geo.mirror.pkgbuild.com/$repo/os/$arch\nServer = https://build-1.cachyos.org/archlinux/$repo/os/$arch\nServer = https://mirror.rackspace.com/archlinux/$repo/os/$arch\n' > /etc/pacman.d/mirrorlist; \
     else \
         curl -L "https://raw.githubusercontent.com/archlinuxarm/PKGBUILDs/master/core/pacman-mirrorlist/mirrorlist" 2>/dev/null | \
             sed -E 's/^\s*#\s*Server\s*=/Server =/g' > /etc/pacman.d/mirrorlist && \
