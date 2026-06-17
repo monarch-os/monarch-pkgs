@@ -1,6 +1,6 @@
 pkgbase = monarch-todo
 	pkgdesc = Fast TUI/CLI todo manager for Monarch
-	pkgver = 0.1.1
+	pkgver = 0.1.2
 	pkgrel = 1
 	url = https://github.com/monarch-os/monarch-todo
 	install = monarch-todo.install
@@ -9,7 +9,7 @@ pkgbase = monarch-todo
 	makedepends = cargo
 	makedepends = git
 	optdepends = monarch: reminders, the Mod+T launcher and the Noctalia bar widget
-	source = monarch-todo-0.1.1::git+https://github.com/monarch-os/monarch-todo.git#tag=v0.1.1
+	source = monarch-todo-0.1.2::git+https://github.com/monarch-os/monarch-todo.git#tag=v0.1.2
 	sha256sums = SKIP
 
 pkgname = monarch-todo
