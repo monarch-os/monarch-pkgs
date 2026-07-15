@@ -33,7 +33,7 @@ Options:
 Examples:
   $0 yay
   $0 yaru-icon-theme --aur yaru
-  $0 ligolo-ng-git --no-sync
+  $0 some-aur-pkg --no-sync
   $0 monarch-zsh --local --scaffold
 EOF
 }
