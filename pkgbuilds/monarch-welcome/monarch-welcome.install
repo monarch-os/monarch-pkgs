@@ -1,0 +1,25 @@
+post_install() {
+    echo "==========================================="
+    echo "  monarch-welcome installed successfully!"
+    echo "==========================================="
+    echo ""
+    echo "Usage:"
+    echo "  monarch-welcome              - Guided setup and desktop tour (TUI)"
+    echo "  monarch-welcome status       - Print the checklist, no TUI"
+    echo ""
+    echo "It drives the monarch CLI and discovers what it can install by"
+    echo "reading \${MONARCH_PATH:-~/.local/share/monarch}/bin, so new"
+    echo "installers appear without an update here."
+    echo ""
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    echo ""
+    echo "monarch-welcome uninstalled. Nothing it set up is undone —"
+    echo "the packages and settings you chose stay as they are."
+    echo ""
+}
