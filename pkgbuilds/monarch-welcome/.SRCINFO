@@ -1,0 +1,16 @@
+pkgbase = monarch-welcome
+	pkgdesc = Onboarding TUI for Monarch — guided setup, app installer and desktop tour
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/monarch-os/monarch-welcome
+	install = monarch-welcome.install
+	arch = x86_64
+	license = MIT
+	makedepends = cargo
+	makedepends = git
+	optdepends = monarch: the CLI this drives — without it the TUI has nothing to set up
+	optdepends = pacman-contrib: accurate pending-update count via checkupdates
+	source = monarch-welcome-0.1.0::git+https://github.com/monarch-os/monarch-welcome.git#tag=v0.1.0
+	sha256sums = SKIP
+
+pkgname = monarch-welcome

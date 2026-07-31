@@ -1,0 +1,50 @@
+# Maintainer: y0no <y0no@monarch.sh>
+
+pkgname=monarch-welcome
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Onboarding TUI for Monarch — guided setup, app installer and desktop tour"
+arch=('x86_64')
+url="https://github.com/monarch-os/monarch-welcome"
+license=('MIT')
+makedepends=(
+    'cargo'
+    'git'
+)
+optdepends=(
+    'monarch: the CLI this drives — without it the TUI has nothing to set up'
+    'pacman-contrib: accurate pending-update count via checkupdates'
+)
+source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-welcome.git#tag=v$pkgver")
+sha256sums=('SKIP')
+install=monarch-welcome.install
+
+prepare() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release
+}
+
+check() {
+    cd "$srcdir/$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo test --frozen --release
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    # Single binary: bare = TUI, `status` = non-interactive checklist.
+    install -Dm755 "target/release/monarch-welcome" "$pkgdir/usr/bin/monarch-welcome"
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
