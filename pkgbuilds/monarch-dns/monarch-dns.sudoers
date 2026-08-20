@@ -1,0 +1,14 @@
+# Switching between the three stock providers is a one-click toggle in the
+# network panel, so it must not stop for a password.
+#
+# Two properties make this safe, and both are load-bearing:
+#
+#   * the path is root-owned. /usr/bin/monarch-dns comes from this package;
+#     a rule naming Monarch's own tree (~/.local/share/monarch/bin) would let
+#     anything running as the user rewrite the script and take root silently.
+#   * the arguments are fixed. Three exact command lines, no wildcard, so there
+#     is nothing for a caller to inject.
+#
+# Custom is deliberately absent: it points the machine at servers the caller
+# supplies, and it already runs somewhere that can ask for a password.
+%wheel ALL=(root) NOPASSWD: /usr/bin/monarch-dns Cloudflare, /usr/bin/monarch-dns Google, /usr/bin/monarch-dns DHCP

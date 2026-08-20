@@ -1,0 +1,237 @@
+#!/bin/bash
+
+# Show or set the system DNS provider.
+#
+# Ported from omarchy-dns, and packaged for the same reason it is there: the
+# network panel toggles this with one click, so it must not stop for a password,
+# and a passwordless sudo rule may only ever name a path root owns. Monarch's
+# tree is a user-writable checkout — a rule pointing into it would hand root to
+# anything running as the user. Hence /usr/bin, and hence this package.
+#
+# Monarch is NetworkManager plus systemd-resolved, so three places decide the
+# answer: NetworkManager's global-dns override, resolved.conf, and the DNS each
+# connection profile pushes onto its link.
+#
+# That third one is not redundant. systemd-resolved asks a link's own servers
+# before the global ones, so a profile still handing out the DHCP resolver wins
+# over anything written above it — the panel would read "Cloudflare" while the
+# machine queried the ISP. `man NetworkManager.conf` says global-dns overrides
+# connection settings, but upstream sets both, and a wrong answer here fails
+# silently. So both.
+
+set -uo pipefail
+
+NM_DNS_CONF=/etc/NetworkManager/conf.d/20-monarch-dns.conf
+RESOLVED_CONF=/etc/systemd/resolved.conf
+
+# The path etc/sudoers.d/monarch-dns names. The privileged half always re-execs
+# from there rather than from whichever copy was invoked, so the grant matches
+# even when this file is run from a checkout.
+PACKAGED_PATH=/usr/bin/monarch-dns
+
+FALLBACK='FallbackDNS=9.9.9.9#dns.quad9.net 149.112.112.112#dns.quad9.net 2620:fe::fe#dns.quad9.net 2620:fe::9#dns.quad9.net'
+
+provider_from_arg() {
+  case "${1:-}" in
+    Cloudflare | cloudflare) echo "Cloudflare" ;;
+    Google | google) echo "Google" ;;
+    DHCP | dhcp) echo "DHCP" ;;
+    Custom | custom) echo "Custom" ;;
+    *) return 1 ;;
+  esac
+}
+
+# True when sudo would run this exact command line without asking. `sudo -l` on
+# its own only answers "permitted", which a blanket %wheel rule says yes to for
+# everything; the long listing prints the matched entry's tags, and
+# !authenticate is the grant in etc/sudoers.d/monarch-dns and nothing else.
+# Listing runs nothing and, under -n, prompts for nothing.
+sudo_grants_passwordless() {
+  sudo -n -l -l "$PACKAGED_PATH" "$@" 2>/dev/null | grep -q '!authenticate'
+}
+
+require_root() {
+  ((EUID == 0)) && return
+
+  # A terminal can carry sudo's own prompt. Without one, sudo is right only
+  # where the grant reaches; pkexec can at least put a prompt on screen.
+  if [[ -t 0 ]] || sudo_grants_passwordless "$@"; then
+    exec sudo "$PACKAGED_PATH" "$@"
+  else
+    exec pkexec "$PACKAGED_PATH" "$@"
+  fi
+}
+
+first_value() {
+  awk -F= -v key="$2" '
+    /^[[:space:]]*#/ { next }
+    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      print value
+      exit
+    }
+  ' "$1" 2>/dev/null
+}
+
+current_provider() {
+  local dns=""
+
+  # NetworkManager's override wins over resolved.conf, so read it first.
+  [[ -f $NM_DNS_CONF ]] && dns=$(first_value "$NM_DNS_CONF" servers)
+  [[ -z ${dns//[[:space:],]/} ]] && dns=$(first_value "$RESOLVED_CONF" DNS)
+
+  if [[ -z ${dns//[[:space:],]/} ]]; then
+    echo "DHCP"
+  elif [[ $dns == *cloudflare-dns.com* || $dns == *1.1.1.1* || $dns == *2606:4700:4700::1111* ]]; then
+    echo "Cloudflare"
+  elif [[ $dns == *dns.google* || $dns == *8.8.8.8* || $dns == *2001:4860:4860::8888* ]]; then
+    echo "Google"
+  else
+    echo "Custom"
+  fi
+}
+
+write_nm_dns() {
+  install -d -m 0755 "$(dirname "$NM_DNS_CONF")"
+  cat >"$NM_DNS_CONF" <<EOF
+# Managed by monarch-dns. Remove this file, or run \`monarch-dns DHCP\`, to take
+# the DNS servers from DHCP again.
+[global-dns]
+
+[global-dns-domain-*]
+servers=$1
+EOF
+}
+
+# Only the two types that carry a link's DNS; a VPN or a bridge profile has no
+# business being rewritten here.
+set_connection_dns() {
+  local uuid type
+
+  while IFS=: read -r uuid type; do
+    [[ -n $uuid ]] || continue
+    case "$type" in
+      802-11-wireless | 802-3-ethernet) ;;
+      *) continue ;;
+    esac
+
+    nmcli connection modify "$uuid" \
+      ipv4.ignore-auto-dns "$1" ipv4.dns "$2" \
+      ipv6.ignore-auto-dns "$1" ipv6.dns "$3" \
+      >/dev/null 2>&1 || true
+  done < <(nmcli -t -f UUID,TYPE connection show 2>/dev/null)
+}
+
+# Servers arrive as one list; the link settings want them split by family, and
+# a `1.1.1.1#cloudflare-dns.com` form has to lose its name first.
+split_by_family() {
+  local server clean
+  ipv4_dns=""
+  ipv6_dns=""
+
+  for server in $1; do
+    clean=${server%%#*}
+    clean=${clean#[}
+    clean=${clean%]}
+    [[ -n $clean ]] || continue
+
+    if [[ $clean == *:* ]]; then
+      ipv6_dns+="${ipv6_dns:+ }$clean"
+    else
+      ipv4_dns+="${ipv4_dns:+ }$clean"
+    fi
+  done
+}
+
+write_resolved() {
+  cat >"$RESOLVED_CONF" <<EOF
+[Resolve]
+DNS=$1
+$FALLBACK
+DNSOverTLS=opportunistic
+EOF
+}
+
+# Order matters, and upstream learned it the hard way: reload NetworkManager's
+# config first, then let resolved reread, then ask NetworkManager to republish.
+# A single conf,dns-full reload up front pushes the *old* servers and leaves the
+# panel showing one selection behind.
+reload_dns_stack() {
+  if systemctl is-active --quiet NetworkManager.service 2>/dev/null; then
+    nmcli general reload conf >/dev/null 2>&1 ||
+      systemctl reload NetworkManager.service 2>/dev/null || true
+
+    # A profile edit only reaches the live link on reapply; without this the
+    # change waits for the next reconnect.
+    local device type state
+    while IFS=: read -r device type state; do
+      [[ -n $device && $state == connected ]] || continue
+      case "$type" in
+        wifi | ethernet) nmcli device reapply "$device" >/dev/null 2>&1 || true ;;
+      esac
+    done < <(nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null)
+  fi
+
+  systemctl reload systemd-resolved.service 2>/dev/null ||
+    systemctl restart systemd-resolved.service 2>/dev/null || true
+
+  if systemctl is-active --quiet NetworkManager.service 2>/dev/null; then
+    nmcli general reload dns-full >/dev/null 2>&1 || true
+  fi
+}
+
+usage() {
+  echo "Usage: monarch-dns [Cloudflare|Google|DHCP|Custom]" >&2
+}
+
+if (($# == 0)); then
+  current_provider
+  exit 0
+fi
+
+if (($# > 1)) || ! provider=$(provider_from_arg "$1"); then
+  usage
+  exit 1
+fi
+
+require_root "$provider"
+
+case "$provider" in
+  Cloudflare)
+    write_nm_dns "1.1.1.1,1.0.0.1,2606:4700:4700::1111,2606:4700:4700::1001"
+    set_connection_dns yes "1.1.1.1 1.0.0.1" "2606:4700:4700::1111 2606:4700:4700::1001"
+    write_resolved "1.1.1.1#cloudflare-dns.com 1.0.0.1#cloudflare-dns.com 2606:4700:4700::1111#cloudflare-dns.com 2606:4700:4700::1001#cloudflare-dns.com"
+    ;;
+  Google)
+    write_nm_dns "8.8.8.8,8.8.4.4,2001:4860:4860::8888,2001:4860:4860::8844"
+    set_connection_dns yes "8.8.8.8 8.8.4.4" "2001:4860:4860::8888 2001:4860:4860::8844"
+    write_resolved "8.8.8.8#dns.google 8.8.4.4#dns.google 2001:4860:4860::8888#dns.google 2001:4860:4860::8844#dns.google"
+    ;;
+  DHCP)
+    rm -f "$NM_DNS_CONF"
+    # Empty servers and auto-dns back on: the profiles return to whatever the
+    # network hands them, which is what DHCP means here.
+    set_connection_dns no "" ""
+    printf '[Resolve]\nDNSOverTLS=no\n' >"$RESOLVED_CONF"
+    ;;
+  Custom)
+    # Deliberately outside the sudoers grant: it points the machine at servers
+    # the caller supplies, and it already runs somewhere that can ask.
+    echo "Enter your DNS servers (space-separated, e.g. '192.168.1.1 1.1.1.1'):"
+    read -r servers || servers=""
+    servers=$(printf '%s\n' "$servers" | tr ',\t\n' '   ' | xargs || true)
+
+    if [[ -z $servers ]]; then
+      echo "Error: no DNS servers provided." >&2
+      exit 1
+    fi
+
+    split_by_family "$servers"
+    write_nm_dns "${servers// /,}"
+    set_connection_dns yes "$ipv4_dns" "$ipv6_dns"
+    write_resolved "$servers"
+    ;;
+esac
+
+reload_dns_stack
