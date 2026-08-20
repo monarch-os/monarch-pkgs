@@ -1,0 +1,200 @@
+#!/bin/bash
+# Monarch Repository Orphan Pruner
+#
+# Removes published packages that no pkgbuilds/ directory produces any more.
+#
+# clean-repo trims *old versions of packages that still exist*; nothing ever
+# dropped a package whose recipe was deleted. update-repo.sh rebuilds the db
+# from the .pkg files on disk, and the nightly workflow pulls the whole repo
+# back down from R2 before building — so a retired package is re-indexed and
+# re-published every single night, forever.
+
+set -e
+
+BUILD_ROOT=$(realpath "${BASH_SOURCE[0]%/*}/..")
+source "$BUILD_ROOT/helpers/message-helpers.sh"
+source "$BUILD_ROOT/helpers/paths.sh"
+
+# Names to keep even though no PKGBUILD produces them. Every entry needs a
+# reason and an expiry condition — this list is a liability, not a config knob.
+KEEP_EXTRA=(
+  # monarch's install/monarch-base.packages still asks for `ligolo-ng-git`;
+  # pkgbuilds/ligolo-ng builds `ligolo-ng` and neither provides nor is
+  # satisfied by the old name. Drop this entry once the monarch-side rename
+  # (migration 1787067945) has shipped and users have run `monarch migrate`.
+  ligolo-ng-git
+)
+
+# Refuse to prune more than this share of the repo without --force. A PKGBUILD
+# that fails to source, a half-cloned pkgbuilds/, a wrong BUILD_ROOT — any of
+# them yields an under-populated keep set, and the difference between "prune 3
+# retired packages" and "prune the entire repo" is one bad glob.
+MAX_PRUNE_PERCENT=50
+
+DRY_RUN=false
+FORCE=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  --dry-run)
+    DRY_RUN=true
+    shift
+    ;;
+  --force)
+    FORCE=true
+    shift
+    ;;
+  --arch)
+    ARCH="$2"
+    update_arch_paths
+    shift 2
+    ;;
+  -h | --help)
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Removes packages from the repository that no pkgbuilds/ directory builds."
+    echo ""
+    echo "Options:"
+    echo "  --dry-run     Show what would be removed without removing it"
+    echo "  --force       Prune even when it exceeds ${MAX_PRUNE_PERCENT}% of the repo"
+    echo "  --arch ARCH   Target architecture (default: x86_64)"
+    echo "  -h, --help    Show this help message"
+    echo ""
+    echo "Run bin/clean-repo for trimming old *versions* of current packages."
+    exit 0
+    ;;
+  *)
+    print_error "Unknown option: $1"
+    exit 1
+    ;;
+  esac
+done
+
+print_header "Prune Orphaned Packages"
+print_info "Repository: $REPO_DIR"
+print_info "PKGBUILDs:  $PKGBUILDS_DIR"
+
+[[ -d "$REPO_DIR" ]] || {
+  print_error "Repository directory not found: $REPO_DIR"
+  exit 1
+}
+[[ -d "$PKGBUILDS_DIR" ]] || {
+  print_error "PKGBUILDs directory not found: $PKGBUILDS_DIR"
+  exit 1
+}
+
+# --- What do we still build? ------------------------------------------------
+# Every name in every pkgname array, split packages included. A PKGBUILD that
+# does not source is fatal rather than skipped: treating it as "produces
+# nothing" is what turns this script into a repo wipe.
+declare -A PRODUCED
+failed=()
+
+for dir in "$PKGBUILDS_DIR"/*/; do
+  [[ -f "$dir/PKGBUILD" ]] || continue
+
+  names=$(bash -c "source '$dir/PKGBUILD' >/dev/null 2>&1 && printf '%s\n' \"\${pkgname[@]}\"" 2>/dev/null) || true
+  if [[ -z "$names" ]]; then
+    failed+=("$(basename "$dir")")
+    continue
+  fi
+
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && PRODUCED[$name]=1
+  done <<<"$names"
+done
+
+if ((${#failed[@]} > 0)); then
+  print_error "These PKGBUILDs did not yield a pkgname: ${failed[*]}"
+  print_error "Refusing to prune against an incomplete picture of what we build."
+  exit 1
+fi
+
+for name in "${KEEP_EXTRA[@]}"; do
+  PRODUCED[$name]=1
+done
+
+print_success "${#PRODUCED[@]} package name(s) currently produced (incl. ${#KEEP_EXTRA[@]} kept by hand)"
+
+# --- What is published? -----------------------------------------------------
+# Read the real pkgname out of .PKGINFO instead of parsing filenames: names
+# containing dashes and digits make filename-stripping guess wrong, and this is
+# a delete path. makepkg's debug packages are named <pkgname>-debug and have no
+# pkgbuilds/ entry of their own, so they are judged by their parent.
+cd "$REPO_DIR"
+
+pkg_name_of() {
+  bsdtar -xOqf "$1" .PKGINFO 2>/dev/null | awk '/^pkgname = /{print substr($0, 11); exit}'
+}
+
+orphan_files=()
+orphan_names=()
+total=0
+unreadable=()
+
+shopt -s nullglob
+for pkg in *.pkg.tar.*; do
+  [[ "$pkg" == *.sig ]] && continue
+  [[ -f "$pkg" ]] || continue
+  total=$((total + 1))
+
+  name=$(pkg_name_of "$pkg")
+  if [[ -z "$name" ]]; then
+    unreadable+=("$pkg")
+    continue
+  fi
+
+  base="${name%-debug}"
+  if [[ -z "${PRODUCED[$name]:-}" && -z "${PRODUCED[$base]:-}" ]]; then
+    orphan_files+=("$pkg")
+    orphan_names+=("$name")
+  fi
+done
+shopt -u nullglob
+
+if ((${#unreadable[@]} > 0)); then
+  print_error "Could not read .PKGINFO from: ${unreadable[*]}"
+  print_error "Refusing to prune while part of the repo is unreadable."
+  exit 1
+fi
+
+if ((total == 0)); then
+  print_error "No packages found in $REPO_DIR — is this the right repository?"
+  exit 1
+fi
+
+if ((${#orphan_files[@]} == 0)); then
+  print_success "Nothing to prune: all $total published package(s) still have a PKGBUILD."
+  exit 0
+fi
+
+# --- Report and act ---------------------------------------------------------
+percent=$((${#orphan_files[@]} * 100 / total))
+print_info "${#orphan_files[@]} of $total published package(s) are orphaned (${percent}%)"
+
+freed=0
+for i in "${!orphan_files[@]}"; do
+  size=$(stat -c %s "${orphan_files[$i]}" 2>/dev/null || echo 0)
+  freed=$((freed + size))
+  printf '    %-46s %8s\n' "${orphan_names[$i]}" "$(numfmt --to=iec-i --suffix=B "$size")"
+done
+print_info "Total: $(numfmt --to=iec-i --suffix=B $freed)"
+
+if ((percent > MAX_PRUNE_PERCENT)) && [[ "$FORCE" != true ]]; then
+  print_error "That is over ${MAX_PRUNE_PERCENT}% of the repository."
+  print_error "If this is genuinely intended, re-run with --force."
+  exit 1
+fi
+
+if [[ "$DRY_RUN" == true ]]; then
+  print_warning "Dry run — nothing was removed."
+  exit 0
+fi
+
+for pkg in "${orphan_files[@]}"; do
+  rm -f "$pkg" "$pkg.sig"
+  print_step "Removed $pkg"
+done
+
+print_success "Pruned ${#orphan_files[@]} package(s), freed $(numfmt --to=iec-i --suffix=B $freed)"
+print_info "Run build/update-repo.sh to rebuild the database without them."
