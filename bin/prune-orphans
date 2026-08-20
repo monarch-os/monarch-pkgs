@@ -10,11 +10,7 @@ source "$BUILD_ROOT/helpers/message-helpers.sh"
 source "$BUILD_ROOT/helpers/paths.sh"
 
 # Kept despite having no PKGBUILD. Each entry needs a reason and an expiry.
-KEEP_EXTRA=(
-  # monarch's monarch-base.packages still asks for it; drop once its rename
-  # migration (1787067945) has shipped.
-  ligolo-ng-git
-)
+KEEP_EXTRA=()
 
 # An under-populated keep set would prune the whole repo, so cap it.
 MAX_PRUNE_PERCENT=50
@@ -100,7 +96,10 @@ for name in "${KEEP_EXTRA[@]}"; do
   PRODUCED[$name]=1
 done
 
-print_success "${#PRODUCED[@]} package name(s) currently produced (incl. ${#KEEP_EXTRA[@]} kept by hand)"
+print_success "${#PRODUCED[@]} package name(s) currently produced"
+if ((${#KEEP_EXTRA[@]} > 0)); then
+  print_info "Plus ${#KEEP_EXTRA[@]} kept by hand: ${KEEP_EXTRA[*]}"
+fi
 
 cd "$REPO_DIR"
 
