@@ -1,32 +1,21 @@
 #!/bin/bash
 
-# Show or set the system DNS provider.
+# Show or set the system DNS provider. Ported from omarchy-dns.
 #
-# Ported from omarchy-dns, and packaged for the same reason it is there: the
-# network panel toggles this with one click, so it must not stop for a password,
-# and a passwordless sudo rule may only ever name a path root owns. Monarch's
-# tree is a user-writable checkout — a rule pointing into it would hand root to
-# anything running as the user. Hence /usr/bin, and hence this package.
+# Packaged rather than kept in Monarch's tree because a NOPASSWD rule may only
+# name a path root owns, and that tree is a user-writable checkout.
 #
-# Monarch is NetworkManager plus systemd-resolved, so three places decide the
-# answer: NetworkManager's global-dns override, resolved.conf, and the DNS each
-# connection profile pushes onto its link.
-#
-# That third one is not redundant. systemd-resolved asks a link's own servers
-# before the global ones, so a profile still handing out the DHCP resolver wins
-# over anything written above it — the panel would read "Cloudflare" while the
-# machine queried the ISP. `man NetworkManager.conf` says global-dns overrides
-# connection settings, but upstream sets both, and a wrong answer here fails
-# silently. So both.
+# Three places are written, not one: resolved asks a link's own servers before
+# the global ones, so a profile still handing out the DHCP resolver silently
+# wins over the other two. Measured, despite what man NetworkManager.conf says.
 
 set -uo pipefail
 
 NM_DNS_CONF=/etc/NetworkManager/conf.d/20-monarch-dns.conf
 RESOLVED_CONF=/etc/systemd/resolved.conf
 
-# The path etc/sudoers.d/monarch-dns names. The privileged half always re-execs
-# from there rather than from whichever copy was invoked, so the grant matches
-# even when this file is run from a checkout.
+# The path the sudoers rule names. Re-exec goes through it, not through
+# whichever copy was invoked, so the grant matches even from a checkout.
 PACKAGED_PATH=/usr/bin/monarch-dns
 
 FALLBACK='FallbackDNS=9.9.9.9#dns.quad9.net 149.112.112.112#dns.quad9.net 2620:fe::fe#dns.quad9.net 2620:fe::9#dns.quad9.net'
@@ -41,11 +30,9 @@ provider_from_arg() {
   esac
 }
 
-# True when sudo would run this exact command line without asking. `sudo -l` on
-# its own only answers "permitted", which a blanket %wheel rule says yes to for
-# everything; the long listing prints the matched entry's tags, and
-# !authenticate is the grant in etc/sudoers.d/monarch-dns and nothing else.
-# Listing runs nothing and, under -n, prompts for nothing.
+# Plain `sudo -l` only answers "permitted", which a blanket %wheel rule says yes
+# to for everything. The long listing prints the matched entry's tags, so
+# !authenticate can only have come from our drop-in.
 sudo_grants_passwordless() {
   sudo -n -l -l "$PACKAGED_PATH" "$@" 2>/dev/null | grep -q '!authenticate'
 }
@@ -53,8 +40,8 @@ sudo_grants_passwordless() {
 require_root() {
   ((EUID == 0)) && return
 
-  # A terminal can carry sudo's own prompt. Without one, sudo is right only
-  # where the grant reaches; pkexec can at least put a prompt on screen.
+  # No terminal to carry sudo's prompt means sudo is right only where the grant
+  # reaches; pkexec can at least put a prompt on screen.
   if [[ -t 0 ]] || sudo_grants_passwordless "$@"; then
     exec sudo "$PACKAGED_PATH" "$@"
   else
@@ -104,8 +91,7 @@ servers=$1
 EOF
 }
 
-# Only the two types that carry a link's DNS; a VPN or a bridge profile has no
-# business being rewritten here.
+# Only the types that carry a link's DNS; a VPN profile is not ours to rewrite.
 set_connection_dns() {
   local uuid type
 
@@ -123,8 +109,7 @@ set_connection_dns() {
   done < <(nmcli -t -f UUID,TYPE connection show 2>/dev/null)
 }
 
-# Servers arrive as one list; the link settings want them split by family, and
-# a `1.1.1.1#cloudflare-dns.com` form has to lose its name first.
+# Link settings want the list split by family, and `1.1.1.1#name` loses its name.
 split_by_family() {
   local server clean
   ipv4_dns=""
@@ -153,17 +138,14 @@ DNSOverTLS=opportunistic
 EOF
 }
 
-# Order matters, and upstream learned it the hard way: reload NetworkManager's
-# config first, then let resolved reread, then ask NetworkManager to republish.
-# A single conf,dns-full reload up front pushes the *old* servers and leaves the
-# panel showing one selection behind.
+# Order matters: a single conf,dns-full reload up front pushes the *old* servers
+# and leaves the caller reading one selection behind. Upstream's, hard-won.
 reload_dns_stack() {
   if systemctl is-active --quiet NetworkManager.service 2>/dev/null; then
     nmcli general reload conf >/dev/null 2>&1 ||
       systemctl reload NetworkManager.service 2>/dev/null || true
 
-    # A profile edit only reaches the live link on reapply; without this the
-    # change waits for the next reconnect.
+    # A profile edit reaches the live link only on reapply.
     local device type state
     while IFS=: read -r device type state; do
       [[ -n $device && $state == connected ]] || continue
@@ -210,14 +192,11 @@ case "$provider" in
     ;;
   DHCP)
     rm -f "$NM_DNS_CONF"
-    # Empty servers and auto-dns back on: the profiles return to whatever the
-    # network hands them, which is what DHCP means here.
     set_connection_dns no "" ""
     printf '[Resolve]\nDNSOverTLS=no\n' >"$RESOLVED_CONF"
     ;;
   Custom)
-    # Deliberately outside the sudoers grant: it points the machine at servers
-    # the caller supplies, and it already runs somewhere that can ask.
+    # Outside the sudoers grant: the servers come from the caller.
     echo "Enter your DNS servers (space-separated, e.g. '192.168.1.1 1.1.1.1'):"
     read -r servers || servers=""
     servers=$(printf '%s\n' "$servers" | tr ',\t\n' '   ' | xargs || true)

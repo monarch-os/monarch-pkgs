@@ -10,8 +10,8 @@ license=('MIT')
 depends=('networkmanager' 'systemd')
 optdepends=('monarch: the network panel that toggles this with one click')
 source=('monarch-dns' 'monarch-dns.sudoers')
-sha256sums=('15ab86ccff08507b0e7ae26236f3b1c0a25f597be972fad49a6b1bbdf935c26f'
-            'ebb6e57ef1261f094e75f6f5eb75c6d9a6129f9005f18b9c4fe79df0f6895abc')
+sha256sums=('becbeb0bc535b439c1fddb045ff04a76de80b006c401c015834d3d9d0d4bf806'
+            '6798446949d1f112b85ca317379bbb2977add9858b15d12b124edf6f40653b48')
 
 # A malformed drop-in makes sudo refuse the whole sudoers set, which locks the
 # machine out of root. Catch it here rather than on the user's disk.
