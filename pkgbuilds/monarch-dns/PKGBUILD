@@ -1,0 +1,28 @@
+# Maintainer: Yoann ONO <contact@y0no.fr>
+
+pkgname=monarch-dns
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Show or set the system DNS provider, with a passwordless grant for the stock three"
+arch=('any')
+url="https://github.com/monarch-os/monarch"
+license=('MIT')
+depends=('networkmanager' 'systemd')
+optdepends=('monarch: the network panel that toggles this with one click')
+source=('monarch-dns' 'monarch-dns.sudoers')
+sha256sums=('becbeb0bc535b439c1fddb045ff04a76de80b006c401c015834d3d9d0d4bf806'
+            '6798446949d1f112b85ca317379bbb2977add9858b15d12b124edf6f40653b48')
+
+# A malformed drop-in makes sudo refuse the whole sudoers set, which locks the
+# machine out of root. Catch it here rather than on the user's disk.
+check() {
+    visudo -c -f monarch-dns.sudoers
+}
+
+package() {
+    install -Dm755 monarch-dns "$pkgdir/usr/bin/monarch-dns"
+
+    # 0440 and root:root, or sudo refuses to read the file at all and every
+    # `sudo` on the machine starts complaining about it.
+    install -Dm440 -o root -g root monarch-dns.sudoers "$pkgdir/etc/sudoers.d/monarch-dns"
+}
