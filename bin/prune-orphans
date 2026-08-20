@@ -9,9 +9,6 @@ BUILD_ROOT=$(realpath "${BASH_SOURCE[0]%/*}/..")
 source "$BUILD_ROOT/helpers/message-helpers.sh"
 source "$BUILD_ROOT/helpers/paths.sh"
 
-# Kept despite having no PKGBUILD. Each entry needs a reason and an expiry.
-KEEP_EXTRA=()
-
 # An under-populated keep set would prune the whole repo, so cap it.
 MAX_PRUNE_PERCENT=50
 
@@ -43,6 +40,10 @@ while [[ $# -gt 0 ]]; do
     echo "  --force       Prune even when it exceeds ${MAX_PRUNE_PERCENT}% of the repo"
     echo "  --arch ARCH   Target architecture (default: x86_64)"
     echo "  -h, --help    Show this help message"
+    echo ""
+    echo "There is no keep-list: to keep a package published, keep a PKGBUILD"
+    echo "that produces its name. During a rename, keep the old pkgname until"
+    echo "the monarch-side migration has shipped."
     echo ""
     echo "Run bin/clean-repo for trimming old *versions* of current packages."
     exit 0
@@ -92,14 +93,7 @@ if ((${#failed[@]} > 0)); then
   exit 1
 fi
 
-for name in "${KEEP_EXTRA[@]}"; do
-  PRODUCED[$name]=1
-done
-
 print_success "${#PRODUCED[@]} package name(s) currently produced"
-if ((${#KEEP_EXTRA[@]} > 0)); then
-  print_info "Plus ${#KEEP_EXTRA[@]} kept by hand: ${KEEP_EXTRA[*]}"
-fi
 
 cd "$REPO_DIR"
 
