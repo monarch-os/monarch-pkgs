@@ -1,13 +1,7 @@
 #!/bin/bash
 # Monarch Repository Orphan Pruner
-#
-# Removes published packages that no pkgbuilds/ directory produces any more.
-#
-# clean-repo trims *old versions of packages that still exist*; nothing ever
-# dropped a package whose recipe was deleted. update-repo.sh rebuilds the db
-# from the .pkg files on disk, and the nightly workflow pulls the whole repo
-# back down from R2 before building — so a retired package is re-indexed and
-# re-published every single night, forever.
+# Removes published packages that no pkgbuilds/ directory produces any more
+# (bin/clean-repo trims old versions of packages that still exist).
 
 set -e
 
@@ -15,20 +9,14 @@ BUILD_ROOT=$(realpath "${BASH_SOURCE[0]%/*}/..")
 source "$BUILD_ROOT/helpers/message-helpers.sh"
 source "$BUILD_ROOT/helpers/paths.sh"
 
-# Names to keep even though no PKGBUILD produces them. Every entry needs a
-# reason and an expiry condition — this list is a liability, not a config knob.
+# Kept despite having no PKGBUILD. Each entry needs a reason and an expiry.
 KEEP_EXTRA=(
-  # monarch's install/monarch-base.packages still asks for `ligolo-ng-git`;
-  # pkgbuilds/ligolo-ng builds `ligolo-ng` and neither provides nor is
-  # satisfied by the old name. Drop this entry once the monarch-side rename
-  # (migration 1787067945) has shipped and users have run `monarch migrate`.
+  # monarch's monarch-base.packages still asks for it; drop once its rename
+  # migration (1787067945) has shipped.
   ligolo-ng-git
 )
 
-# Refuse to prune more than this share of the repo without --force. A PKGBUILD
-# that fails to source, a half-cloned pkgbuilds/, a wrong BUILD_ROOT — any of
-# them yields an under-populated keep set, and the difference between "prune 3
-# retired packages" and "prune the entire repo" is one bad glob.
+# An under-populated keep set would prune the whole repo, so cap it.
 MAX_PRUNE_PERCENT=50
 
 DRY_RUN=false
@@ -83,10 +71,8 @@ print_info "PKGBUILDs:  $PKGBUILDS_DIR"
   exit 1
 }
 
-# --- What do we still build? ------------------------------------------------
 # Every name in every pkgname array, split packages included. A PKGBUILD that
-# does not source is fatal rather than skipped: treating it as "produces
-# nothing" is what turns this script into a repo wipe.
+# does not source is fatal, never "produces nothing".
 declare -A PRODUCED
 failed=()
 
@@ -116,12 +102,10 @@ done
 
 print_success "${#PRODUCED[@]} package name(s) currently produced (incl. ${#KEEP_EXTRA[@]} kept by hand)"
 
-# --- What is published? -----------------------------------------------------
-# Read the real pkgname out of .PKGINFO instead of parsing filenames: names
-# containing dashes and digits make filename-stripping guess wrong, and this is
-# a delete path. makepkg's debug packages are named <pkgname>-debug and have no
-# pkgbuilds/ entry of their own, so they are judged by their parent.
 cd "$REPO_DIR"
+
+# From .PKGINFO, not the filename: dashes and digits in names make
+# filename-stripping guess wrong, and this is a delete path.
 
 pkg_name_of() {
   bsdtar -xOqf "$1" .PKGINFO 2>/dev/null | awk '/^pkgname = /{print substr($0, 11); exit}'
@@ -144,6 +128,7 @@ for pkg in *.pkg.tar.*; do
     continue
   fi
 
+  # makepkg's <pkgname>-debug has no pkgbuilds/ entry; judge it by its parent.
   base="${name%-debug}"
   if [[ -z "${PRODUCED[$name]:-}" && -z "${PRODUCED[$base]:-}" ]]; then
     orphan_files+=("$pkg")
@@ -168,7 +153,6 @@ if ((${#orphan_files[@]} == 0)); then
   exit 0
 fi
 
-# --- Report and act ---------------------------------------------------------
 percent=$((${#orphan_files[@]} * 100 / total))
 print_info "${#orphan_files[@]} of $total published package(s) are orphaned (${percent}%)"
 
