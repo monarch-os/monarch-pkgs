@@ -227,6 +227,23 @@ build_package() {
   fi
 }
 
+# What each pkgbuilds/ directory provides, mapped back to that directory. A
+# dependency may name what a package provides rather than the package itself —
+# displaylink wants `evdi`, which pkgbuilds/evdi-dkms provides — and without this
+# the ordering below never sees the edge.
+declare -A PROVIDER_DIR
+build_provider_map() {
+  local dir name provided
+  for dir in /pkgbuilds/*/; do
+    [[ -f "$dir/PKGBUILD" ]] || continue
+    name=$(basename "$dir")
+    while IFS= read -r provided; do
+      provided=$(echo "$provided" | sed 's/[<>=].*$//')
+      [[ -n "$provided" && "$provided" != "$name" ]] && PROVIDER_DIR[$provided]="$name"
+    done < <(source "$dir/PKGBUILD" 2>/dev/null; printf '%s\n' "${provides[@]}")
+  done
+}
+
 # Get package dependencies from PKGBUILD
 get_package_deps() {
   local pkg="$1"
@@ -243,9 +260,12 @@ get_package_deps() {
   ) | tr ' ' '\n' | while read -r dep; do
     # Strip version constraints (e.g., 'hyprshade>=1.0' -> 'hyprshade')
     dep=$(echo "$dep" | sed 's/[<>=].*$//')
-    # Check if this dependency exists in our pkgbuilds
+    # Check if this dependency exists in our pkgbuilds, by directory name or by
+    # what one of them provides.
     if [[ -d "/pkgbuilds/$dep" ]]; then
       echo "$dep"
+    elif [[ -n "${PROVIDER_DIR[$dep]:-}" ]]; then
+      echo "${PROVIDER_DIR[$dep]}"
     fi
   done
 }
@@ -370,6 +390,7 @@ if [[ ${#PACKAGES_TO_BUILD[@]} -eq 0 ]]; then
 else
   echo "==> ${#PACKAGES_TO_BUILD[@]} package(s) need building: ${PACKAGES_TO_BUILD[@]}"
   echo "==> Determining build order based on dependencies..."
+  build_provider_map
   
   # Second pass: order only the packages that need building
   # Strategy: build packages with no unmet dependencies first
