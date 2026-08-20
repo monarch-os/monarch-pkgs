@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
     echo "Examples:"
     echo "  $0 --arch aarch64"
     echo "  $0 --package yay"
-    echo "  $0 --package yay elephant cursor-bin"
+    echo "  $0 --package yay ffuf-bin cursor-bin"
     echo ""
     exit 0
     ;;
