@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Replaces upstream's displaylink-sleep.sh, the one change this package makes to
+# the AUR recipe. Theirs writes S/R into /tmp/PmMessagesPort_in unbounded: with
+# no reader — DisplayLinkManager can run without holding that FIFO open — the
+# write never returns, and systemd kills the whole sleep batch at its 90s
+# deadline, on suspend and again on resume while NetworkManager is still
+# inhibited. That is how the machine wakes with no Wi-Fi. Same handshake, every
+# blocking step bounded.
+
+FIFO_IN=${MONARCH_DISPLAYLINK_FIFO_IN:-/tmp/PmMessagesPort_in}
+FIFO_OUT=${MONARCH_DISPLAYLINK_FIFO_OUT:-/tmp/PmMessagesPort_out}
+
+[[ -p $FIFO_IN ]] || exit 0
+
+case "$1" in
+  pre)
+    # Drop a stale ack so the wait below cannot return an older byte.
+    timeout 1 cat "$FIFO_OUT" >/dev/null 2>&1
+
+    if printf 'S' | timeout 2 tee "$FIFO_IN" >/dev/null 2>&1; then
+      timeout 3 head -c 1 "$FIFO_OUT" >/dev/null 2>&1
+    fi
+    ;;
+  post)
+    printf 'R' | timeout 2 tee "$FIFO_IN" >/dev/null 2>&1
+    ;;
+esac
+
+# A dock that missed its message is cosmetic; a hook that fails the batch is not.
+exit 0
