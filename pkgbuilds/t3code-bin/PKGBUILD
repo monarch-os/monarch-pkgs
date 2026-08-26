@@ -58,8 +58,8 @@ _appimage="T3-Code-${pkgver}-x86_64.AppImage"
 source=('t3code-launcher.sh' 'LICENSE')
 source_x86_64=("${_appimage}::https://github.com/pingdotgg/t3code/releases/download/v${pkgver}/${_appimage}")
 noextract=("${_appimage}")
-sha256sums=('cb905ff341372ef2ef6e402cf485959f8bd1df8f0efebee4cda1afdd5e6abc0a'
-            '935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43')
+sha256sums=('ea275b6e148b3c3409e48a23fff545272b5127f4b2f3df36a144abbe3c6118a3'
+            'fc800ae3e2c8e200cf1d1ad023ce57df01887005482646d8337ff25e1feafaf5')
 sha256sums_x86_64=('415c8648f43c3d22d572f27f2c50fdc8c310ea7fcde9537b903e1e2f1c8775a1')
 
 prepare() {
