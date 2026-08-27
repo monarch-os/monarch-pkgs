@@ -65,5 +65,7 @@ package() {
       ln -s "/usr/share/monarch/bin/${command##*/}" "$pkgdir/usr/bin/${command##*/}"
     done
 
+  install -Dm644 "$srcdir/monarch/default/libalpm/hooks/00-monarch-update-guard.hook" \
+    "$pkgdir/usr/share/libalpm/hooks/00-monarch-update-guard.hook"
   install -Dm644 "$srcdir/monarch/LICENSE" "$pkgdir/usr/share/licenses/monarch/LICENSE"
 }
