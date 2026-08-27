@@ -1,0 +1,165 @@
+pkgname=monarch-settings
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Monarch system and user defaults"
+arch=('any')
+url="https://github.com/monarch-os/monarch"
+license=('MIT')
+depends=('bash' 'curl' 'gum' 'hicolor-icon-theme' 'plymouth')
+makedepends=('git')
+install='monarch-settings.install'
+backup=(
+  'etc/fastfetch/config.jsonc'
+  'etc/mkinitcpio.conf.d/monarch_hooks.conf'
+  'etc/mkinitcpio.conf.d/thunderbolt_module.conf'
+  'etc/limine-entry-tool.d/monarch-defaults.conf'
+  'etc/limine-entry-tool.d/monarch-uki.conf'
+  'etc/docker/daemon.json'
+  'etc/gnupg/dirmngr.conf'
+  'etc/sysctl.d/99-monarch-sysctl.conf'
+  'etc/sysctl.d/90-monarch-file-watchers.conf'
+  'etc/modprobe.d/monarch-usb-autosuspend.conf'
+  'etc/systemd/logind.conf.d/10-ignore-power-button.conf'
+  'etc/systemd/logind.conf.d/20-inhibit-delay.conf'
+  'etc/systemd/resolved.conf.d/10-disable-multicast.conf'
+  'etc/systemd/resolved.conf.d/20-docker-dns.conf'
+  'etc/systemd/system.conf.d/10-faster-shutdown.conf'
+  'etc/systemd/system/user@.service.d/10-faster-shutdown.conf'
+  'etc/systemd/system/docker.service.d/no-block-boot.conf'
+  'etc/systemd/system/plocate-updatedb.service.d/ac-only.conf'
+  'etc/systemd/system.conf.d/20-monarch-nofile.conf'
+  'etc/systemd/user.conf.d/20-monarch-nofile.conf'
+  'etc/systemd/oomd.conf.d/10-monarch.conf'
+  'etc/sddm.conf.d/10-theme.conf'
+  'etc/sddm.conf.d/10-wayland.conf'
+)
+if [[ -n ${MONARCH_SRC:-} ]]; then
+  source=()
+  sha256sums=()
+else
+  source=("monarch::git+https://github.com/monarch-os/monarch.git#branch=dev")
+  sha256sums=('SKIP')
+fi
+
+pkgver() {
+  cd "$srcdir/monarch"
+  if [[ -d .git ]]; then
+    git describe --long --tags 2>/dev/null | sed 's/^v//;s/-/.r/;s/-/./' ||
+      printf '0.r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  else
+    tr -cd '0-9A-Za-z._+' <version
+  fi
+}
+
+prepare() {
+  if [[ -n ${MONARCH_SRC:-} ]]; then
+    rm -rf "$srcdir/monarch"
+    mkdir -p "$srcdir/monarch"
+    cp -a "$MONARCH_SRC/." "$srcdir/monarch/"
+  fi
+}
+
+package() {
+  cd "$srcdir/monarch"
+
+  install -d "$pkgdir/etc/skel/.config" "$pkgdir/usr/share/monarch/config"
+  cp -a config/. "$pkgdir/etc/skel/.config/"
+  cp -a config/. "$pkgdir/usr/share/monarch/config/"
+
+  install -d "$pkgdir/usr/share/monarch/default" "$pkgdir/usr/share/monarch/applications"
+  cp -a default/. "$pkgdir/usr/share/monarch/default/"
+  cp -a applications/. "$pkgdir/usr/share/monarch/applications/"
+
+  install -d "$pkgdir/etc"
+  cp -a etc/. "$pkgdir/etc/"
+
+  install -d "$pkgdir/usr/share/monarch/etc-overrides"
+  install -Dm644 default/bashrc "$pkgdir/usr/share/monarch/etc-overrides/dot.bashrc"
+  install -Dm644 LICENSE "$pkgdir/usr/share/monarch/etc-overrides/LICENSE"
+  printf '%s\n' \
+    'NAME="Monarch"' \
+    'PRETTY_NAME="Monarch"' \
+    'ID=monarch' \
+    'ID_LIKE="cachyos arch"' \
+    "BUILD_ID=\"$pkgver\"" \
+    "VERSION_ID=\"$pkgver\"" \
+    'ANSI_COLOR="38;2;168;85;247"' \
+    'HOME_URL="https://www.monarchlinux.com/"' \
+    'BUG_REPORT_URL="https://github.com/monarch-os/monarch/issues"' \
+    'LOGO=monarch' >"$pkgdir/usr/share/monarch/etc-overrides/os-release"
+  for mapping in \
+    'security/faillock.conf:security-faillock.conf' \
+    'nsswitch.conf:nsswitch.conf' \
+    'cups/cups-browsed.conf:cups-cups-browsed.conf' \
+    'plymouth/plymouthd.conf:plymouth-plymouthd.conf'; do
+    source_path=${mapping%%:*}
+    target_name=${mapping#*:}
+    if [[ -f $pkgdir/etc/$source_path ]]; then
+      mv "$pkgdir/etc/$source_path" "$pkgdir/usr/share/monarch/etc-overrides/$target_name"
+    fi
+  done
+  rmdir "$pkgdir/etc/security" 2>/dev/null || true
+  rmdir "$pkgdir/etc/cups" 2>/dev/null || true
+  rmdir "$pkgdir/etc/plymouth" 2>/dev/null || true
+
+  # User services are vendor units, while ~/.config/systemd/user remains
+  # available for user overrides.
+  install -Dm644 default/systemd/user/monarch-battery-monitor.service \
+    "$pkgdir/usr/lib/systemd/user/monarch-battery-monitor.service"
+  install -Dm644 default/systemd/user/monarch-battery-monitor.timer \
+    "$pkgdir/usr/lib/systemd/user/monarch-battery-monitor.timer"
+  install -Dm644 default/systemd/user/monarch-crash-watch.service \
+    "$pkgdir/usr/lib/systemd/user/monarch-crash-watch.service"
+  install -Dm644 default/systemd/user/monarch-obsidian-theme.path \
+    "$pkgdir/usr/lib/systemd/user/monarch-obsidian-theme.path"
+  install -Dm644 default/systemd/user/monarch-obsidian-theme.service \
+    "$pkgdir/usr/lib/systemd/user/monarch-obsidian-theme.service"
+  install -Dm644 default/systemd/user/monarch-recover-internal-monitor.service \
+    "$pkgdir/usr/lib/systemd/user/monarch-recover-internal-monitor.service"
+
+  # The suspend hook is system-wide even though its source lives with the
+  # other Monarch defaults.
+  install -Dm755 default/systemd/system-sleep/unmount-fuse \
+    "$pkgdir/usr/lib/systemd/system-sleep/unmount-fuse"
+  install -Dm644 default/tmpfiles.d/monarch-nopasswd-sudo.conf \
+    "$pkgdir/usr/lib/tmpfiles.d/monarch-nopasswd-sudo.conf"
+
+  if [[ -d $pkgdir/etc/sudoers.d ]]; then
+    chmod 0750 "$pkgdir/etc/sudoers.d"
+    chmod 0440 "$pkgdir/etc/sudoers.d"/*
+  fi
+
+  install -d "$pkgdir/etc/skel/.local/share/applications"
+  cp applications/*.desktop "$pkgdir/etc/skel/.local/share/applications/" 2>/dev/null || true
+  cp applications/hidden/*.desktop "$pkgdir/etc/skel/.local/share/applications/" 2>/dev/null || true
+
+  # Static per-user defaults that do not live under config/.
+  install -Dm644 default/zshrc "$pkgdir/etc/skel/.zshrc"
+  install -Dm644 logo.txt "$pkgdir/etc/skel/.config/monarch/branding/screensaver.txt"
+  install -Dm644 icon.txt "$pkgdir/etc/skel/.config/monarch/branding/about.txt"
+  install -Dm644 default/nautilus-python/extensions/localsend.py \
+    "$pkgdir/etc/skel/.local/share/nautilus-python/extensions/localsend.py"
+  install -Dm644 default/nautilus-python/extensions/transcode.py \
+    "$pkgdir/etc/skel/.local/share/nautilus-python/extensions/transcode.py"
+  install -Dm644 default/pi/agent/extensions/monarch-system-theme.ts \
+    "$pkgdir/etc/skel/.pi/agent/extensions/monarch-system-theme.ts"
+
+  install -d "$pkgdir/etc/skel/.local/share/noctalia/plugins"
+  cp -a default/noctalia/plugins/. "$pkgdir/etc/skel/.local/share/noctalia/plugins/"
+  install -d "$pkgdir/etc/skel/.local/state/noctalia"
+  touch "$pkgdir/etc/skel/.local/state/noctalia/.setup-complete"
+
+  install -d "$pkgdir/usr/share/sddm/themes" "$pkgdir/usr/share/sddm"
+  cp -a default/sddm/monarch "$pkgdir/usr/share/sddm/themes/"
+  install -Dm644 default/sddm/niri.kdl "$pkgdir/usr/share/sddm/niri.kdl"
+  install -Dm644 default/wayland-sessions/monarch.desktop \
+    "$pkgdir/usr/local/share/wayland-sessions/monarch.desktop"
+
+  install -d "$pkgdir/usr/share/plymouth/themes/monarch"
+  cp -a default/plymouth/. "$pkgdir/usr/share/plymouth/themes/monarch/"
+  find "$pkgdir/usr/share/plymouth/themes/monarch" -type d -exec chmod 0755 {} +
+  find "$pkgdir/usr/share/plymouth/themes/monarch" -type f -exec chmod 0644 {} +
+
+  install -Dm644 default/snapper/root "$pkgdir/etc/snapper/config-templates/monarch"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/monarch-settings/LICENSE"
+}
