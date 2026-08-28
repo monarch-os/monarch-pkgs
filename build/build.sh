@@ -198,9 +198,21 @@ build_package() {
   MAKEPKG_FLAGS="-scf --noconfirm"
 
   if PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
+    local package_files=()
     for pkg_file in *.pkg.tar.*; do
-      [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
+      [[ -f "$pkg_file" && $pkg_file != *.sig ]] && package_files+=("$pkg_file")
     done
+
+    if [[ -x /pkgbuilds/$pkg/package-test.sh ]]; then
+      echo "    Running package tests..."
+      if ! /pkgbuilds/$pkg/package-test.sh "${package_files[@]}"; then
+        echo "    ❌ Package tests failed for $pkg"
+        FAILED_PACKAGES="$FAILED_PACKAGES $pkg"
+        return 1
+      fi
+    fi
+
+    cp "${package_files[@]}" "$BUILD_OUTPUT_DIR/"
 
     cd "$BUILD_OUTPUT_DIR"
 
