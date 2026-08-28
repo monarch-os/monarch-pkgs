@@ -37,7 +37,7 @@ if [[ -n ${MONARCH_SRC:-} ]]; then
   source=()
   sha256sums=()
 else
-  source=("monarch::git+https://github.com/monarch-os/monarch.git#branch=dev")
+  source=("monarch::git+https://github.com/monarch-os/monarch.git#branch=noctalia-v5")
   sha256sums=('SKIP')
 fi
 
