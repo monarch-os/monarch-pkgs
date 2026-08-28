@@ -53,7 +53,7 @@ prepare() {
 
 package() {
   install -d "$pkgdir/usr/share/monarch" "$pkgdir/usr/bin"
-  cp -r "$srcdir/monarch"/{assets,bin,install,migrations,themes} \
+  cp -r "$srcdir/monarch"/{assets,bin,install,themes} \
     "$pkgdir/usr/share/monarch/"
   cp "$srcdir/monarch"/{LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt,version} \
     "$pkgdir/usr/share/monarch/"
