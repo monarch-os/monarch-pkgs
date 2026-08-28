@@ -50,8 +50,7 @@ echo "  -> monarch-build (priority 1): $BUILD_OUTPUT_DIR"
 # Initialize empty build database if it doesn't exist
 cd "$BUILD_OUTPUT_DIR"
 if [[ ! -f "monarch-build.db.tar.zst" ]]; then
-  # Create an empty database
-  repo-add monarch-build.db.tar.zst >/dev/null 2>&1
+  tar --zstd -cf monarch-build.db.tar.zst --files-from /dev/null
   ln -sf monarch-build.db.tar.zst monarch-build.db
 else
   # Database exists, check if we need to rebuild it from packages
