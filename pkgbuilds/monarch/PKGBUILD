@@ -6,11 +6,9 @@ arch=('any')
 url="https://github.com/monarch-os/monarch"
 license=('MIT')
 depends=(
-  "monarch-settings=${pkgver}"
+  'monarch-settings'
   'bash'
   'limine'
-  'limine-mkinitcpio-hook'
-  'limine-snapper-sync'
   'snapper'
   'niri'
   'noctalia'
@@ -23,6 +21,10 @@ depends=(
   'gum'
   'jq'
   'git'
+)
+optdepends=(
+  'limine-mkinitcpio-hook: automatically maintain Limine kernel entries on CachyOS'
+  'limine-snapper-sync: expose Snapper snapshots through Limine on CachyOS'
 )
 makedepends=('git')
 if [[ -n ${MONARCH_SRC:-} ]]; then
