@@ -1,0 +1,26 @@
+_monarch_etc_overrides_apply() {
+  install -d /etc/plymouth /etc/security /etc/skel
+
+  rm -f /etc/os-release
+  cp -f /usr/share/monarch/etc-overrides/os-release /etc/os-release
+  cp -f /usr/share/monarch/etc-overrides/security-faillock.conf /etc/security/faillock.conf
+  cp -f /usr/share/monarch/etc-overrides/nsswitch.conf /etc/nsswitch.conf
+  cp -f /usr/share/monarch/etc-overrides/plymouth-plymouthd.conf /etc/plymouth/plymouthd.conf
+  cp -f /usr/share/monarch/etc-overrides/dot.bashrc /etc/skel/.bashrc
+
+  if [[ -f /etc/cups/cups-browsed.conf ]]; then
+    cp -f /usr/share/monarch/etc-overrides/cups-cups-browsed.conf /etc/cups/cups-browsed.conf
+    chmod 0644 /etc/cups/cups-browsed.conf
+  fi
+
+  chmod 0644 /etc/os-release /etc/security/faillock.conf /etc/nsswitch.conf \
+    /etc/plymouth/plymouthd.conf /etc/skel/.bashrc
+}
+
+post_install() {
+  _monarch_etc_overrides_apply
+}
+
+post_upgrade() {
+  _monarch_etc_overrides_apply
+}

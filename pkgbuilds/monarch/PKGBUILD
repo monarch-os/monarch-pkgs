@@ -1,0 +1,71 @@
+pkgname=monarch
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Monarch desktop runtime"
+arch=('any')
+url="https://github.com/monarch-os/monarch"
+license=('MIT')
+depends=(
+  "monarch-settings=${pkgver}"
+  'bash'
+  'limine'
+  'limine-mkinitcpio-hook'
+  'limine-snapper-sync'
+  'snapper'
+  'niri'
+  'noctalia'
+  'uwsm'
+  'sddm'
+  'xdg-desktop-portal-gnome'
+  'wireplumber'
+  'pipewire'
+  'gnome-keyring'
+  'gum'
+  'jq'
+  'git'
+)
+makedepends=('git')
+if [[ -n ${MONARCH_SRC:-} ]]; then
+  source=()
+  sha256sums=()
+else
+  source=("monarch::git+https://github.com/monarch-os/monarch.git#branch=noctalia-v5")
+  sha256sums=('SKIP')
+fi
+
+pkgver() {
+  cd "$srcdir/monarch"
+  if [[ -d .git ]]; then
+    git describe --long --tags 2>/dev/null | sed 's/^v//;s/-/.r/;s/-/./' ||
+      printf '0.r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  else
+    tr -cd '0-9A-Za-z._+' <version
+  fi
+}
+
+prepare() {
+  if [[ -n ${MONARCH_SRC:-} ]]; then
+    rm -rf "$srcdir/monarch"
+    mkdir -p "$srcdir/monarch"
+    cp -a "$MONARCH_SRC/." "$srcdir/monarch/"
+  fi
+}
+
+package() {
+  install -d "$pkgdir/usr/share/monarch" "$pkgdir/usr/bin"
+  cp -r "$srcdir/monarch"/{assets,bin,install,themes} \
+    "$pkgdir/usr/share/monarch/"
+  cp "$srcdir/monarch"/{LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt,version} \
+    "$pkgdir/usr/share/monarch/"
+
+  find "$pkgdir/usr/share/monarch/bin" -maxdepth 1 -type f \
+    \( -name monarch -o -name 'monarch-*' \) -print0 |
+    while IFS= read -r -d '' command; do
+      chmod 755 "$command"
+      ln -s "/usr/share/monarch/bin/${command##*/}" "$pkgdir/usr/bin/${command##*/}"
+    done
+
+  install -Dm644 "$srcdir/monarch/default/libalpm/hooks/00-monarch-update-guard.hook" \
+    "$pkgdir/usr/share/libalpm/hooks/00-monarch-update-guard.hook"
+  install -Dm644 "$srcdir/monarch/LICENSE" "$pkgdir/usr/share/licenses/monarch/LICENSE"
+}
