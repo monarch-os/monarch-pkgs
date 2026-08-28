@@ -4,6 +4,11 @@ Build system for the Monarch Package Repository. This repo is a fork of [Omarchy
 
 **Multi-Architecture**: Supports both x86_64 and aarch64 (ARM64).
 
+## Tests
+
+Run `test/run` to validate repository and package-recipe contracts before a
+build.
+
 ## Prerequisites
 ### aarch64 Builds (Optional)
 
