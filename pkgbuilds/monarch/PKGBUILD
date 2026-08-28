@@ -6,7 +6,7 @@ arch=('any')
 url="https://github.com/monarch-os/monarch"
 license=('MIT')
 depends=(
-  "monarch-settings=${pkgver}"
+  'monarch-settings'
   'bash'
   'limine'
   'limine-mkinitcpio-hook'
