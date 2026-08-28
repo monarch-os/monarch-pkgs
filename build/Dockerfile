@@ -120,6 +120,16 @@ RUN pacman -Syu --noconfirm && \
     pacman -Scc --noconfirm && \
     rm -rf /var/cache/pacman/pkg/*
 
+RUN if [ "${TARGETARCH}" = "amd64" ]; then \
+        pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && \
+        pacman-key --lsign-key F3B607488DB35A47 && \
+        pacman -U --noconfirm \
+            https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-keyring-20240331-1-any.pkg.tar.zst && \
+        pacman-key --populate cachyos && \
+        sed -i '/^\[core\]/i [cachyos]\nServer = https://mirror.cachyos.org/repo/$arch/$repo\n' /etc/pacman.conf && \
+        pacman -Sy --noconfirm; \
+    fi
+
 # makepkg cannot run as root
 RUN useradd -m -G wheel -s /bin/bash builder && \
     echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
