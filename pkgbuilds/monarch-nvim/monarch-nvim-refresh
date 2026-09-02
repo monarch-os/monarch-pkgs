@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# monarch:summary=Back up and refresh the Monarch Neovim configuration.
+# monarch:group=refresh
+# monarch:name=nvim
+
+exec "${MONARCH_NVIM_SETUP_BIN:-/usr/bin/monarch-nvim-setup}" --refresh "$@"

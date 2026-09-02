@@ -1,7 +1,7 @@
 pkgbase = monarch-nvim
 	pkgdesc = Pre-built LazyVim configuration with cached plugins
 	pkgver = 2026.4.8
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/LazyVim/LazyVim
 	arch = any
 	license = MIT
