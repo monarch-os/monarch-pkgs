@@ -1,57 +1,98 @@
 #!/bin/bash
-# Setup script for monarch-nvim
-# This can be called from Monarch setup scripts
+
+# monarch:summary=Install the packaged Monarch Neovim configuration.
+# monarch:group=setup
+# monarch:name=nvim
 
 set -euo pipefail
 
-PACKAGE_DIR="/usr/share/monarch-nvim"
-CONFIG_DIR="${HOME}/.config/nvim"
-DATA_DIR="${HOME}/.local/share/nvim"
-STATE_DIR="${HOME}/.local/state/nvim"
-CACHE_DIR="${HOME}/.cache/nvim"
+SKEL_CONFIG_DIR="${MONARCH_NVIM_SKEL_CONFIG_DIR:-/etc/skel/.config/nvim}"
+SKEL_DATA_DIR="${MONARCH_NVIM_SKEL_DATA_DIR:-/etc/skel/.local/share/nvim}"
+PACKAGE_DIR="${MONARCH_NVIM_PACKAGE_DIR:-/usr/share/monarch-nvim}"
+CONFIG_SOURCE_DIR="$SKEL_CONFIG_DIR"
+DATA_SOURCE_DIR="$SKEL_DATA_DIR"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/nvim"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/nvim"
+refresh=false
 
-# Check if package is installed
-if [[ ! -d "$PACKAGE_DIR" ]]; then
-  echo "Error: monarch-nvim package not installed"
+while (( $# > 0 )); do
+  case "$1" in
+  --force | --refresh)
+    refresh=true
+    ;;
+  -h | --help)
+    cat <<'EOF'
+Usage: monarch-nvim-setup [--force]
+
+Install Monarch's Neovim defaults when missing. --force backs up and replaces
+the existing configuration and cached data.
+EOF
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  esac
+  shift
+done
+
+if [[ ! -d $CONFIG_SOURCE_DIR ]]; then
+  CONFIG_SOURCE_DIR="$PACKAGE_DIR/config"
+fi
+
+if [[ ! -d $CONFIG_SOURCE_DIR || ! -d $DATA_SOURCE_DIR ]]; then
+  echo "Monarch Neovim defaults are missing from $CONFIG_SOURCE_DIR or $DATA_SOURCE_DIR." >&2
+  echo "Restore them with: sudo pacman -S monarch-nvim" >&2
   exit 1
 fi
 
-# Check if nvim config already exists
-if [[ -d "$CONFIG_DIR" ]]; then
-  if gum confirm "$(echo -e "Neovim configuration already exists at $CONFIG_DIR.\nThis will create a backup and overwrite it. Continue?")"; then
-    # Backup existing config
-    BACKUP_DIR="${CONFIG_DIR}.backup.$(date +%Y%m%d-%H%M%S)"
-    echo "Backing up existing config to $BACKUP_DIR"
-    mv "$CONFIG_DIR" "$BACKUP_DIR"
-  else
-    echo "Setup cancelled."
-    exit 0
+backup_path() {
+  local path="$1"
+  local backup="${path}.backup.$(date +%Y%m%d-%H%M%S)"
+
+  if [[ -e $path || -L $path ]]; then
+    echo "Backing up $path to $backup"
+    mv "$path" "$backup"
+  fi
+}
+
+copy_tree() {
+  local src="$1" dest="$2"
+
+  mkdir -p "$(dirname "$dest")"
+  cp -a "$src" "$dest"
+}
+
+if [[ -d $CONFIG_DIR && $refresh != true ]]; then
+  echo "Neovim config already exists at $CONFIG_DIR; leaving it in place."
+else
+  backup_path "$CONFIG_DIR"
+  copy_tree "$CONFIG_SOURCE_DIR" "$CONFIG_DIR"
+  echo "Installed Neovim config to $CONFIG_DIR"
+fi
+
+if [[ -d $DATA_DIR && $refresh != true ]]; then
+  echo "Neovim data already exists at $DATA_DIR; leaving it in place."
+else
+  if [[ $refresh == true ]]; then
+    rm -rf "$DATA_DIR" "$CACHE_DIR" "$STATE_DIR"
+  fi
+  copy_tree "$DATA_SOURCE_DIR" "$DATA_DIR"
+  echo "Installed Neovim data to $DATA_DIR"
+fi
+
+if (( EUID == 0 )); then
+  target_user="${SUDO_USER:-${USER:-root}}"
+  if [[ $target_user != "root" ]]; then
+    chown -R "$target_user:$target_user" "$CONFIG_DIR" "$DATA_DIR"
   fi
 fi
 
-echo "Setting up Neovim configuration..."
-
-# Make sure everything is clear
-rm -rf $DATA_DIR $CACHE_DIR $STATE_DIR
-
-# Create directories if needed
-mkdir -p "$(dirname "$CONFIG_DIR")"
-mkdir -p "$(dirname "$DATA_DIR")"
-
-# Copy files (cache will be regenerated on first use)
-cp -r "$PACKAGE_DIR/config" "$CONFIG_DIR"
-cp -r "$PACKAGE_DIR/data" "$DATA_DIR"
-
-# Ensure proper ownership of all nvim directories
-chown -R "${USER}:${USER}" "$CONFIG_DIR"
-chown -R "${USER}:${USER}" "$DATA_DIR"
-
-# Create link for current theme
-ln -snf "${HOME}/.config/monarch/current/theme/neovim.lua" "${CONFIG_DIR}/lua/plugins/theme.lua"
-
-# Restore git working trees
-for dir in $DATA_DIR/lazy/*/; do
-  if [ -d "$dir/.git" ]; then
+for dir in "$DATA_DIR"/lazy/*/; do
+  if [[ -d "$dir/.git" ]]; then
     git --git-dir="$dir/.git" --work-tree="$dir" restore .
   fi
 done
@@ -75,4 +116,8 @@ xdg-mime default nvim.desktop text/x-c++
 xdg-mime default nvim.desktop application/xml
 xdg-mime default nvim.desktop text/xml
 
-echo "Neovim setup complete!"
+if [[ $refresh == true ]]; then
+  echo "Neovim refresh complete!"
+else
+  echo "Neovim setup complete!"
+fi
