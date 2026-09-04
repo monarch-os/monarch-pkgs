@@ -90,7 +90,6 @@ package() {
   for mapping in \
     'security/faillock.conf:security-faillock.conf' \
     'nsswitch.conf:nsswitch.conf' \
-    'cups/cups-browsed.conf:cups-cups-browsed.conf' \
     'plymouth/plymouthd.conf:plymouth-plymouthd.conf'; do
     source_path=${mapping%%:*}
     target_name=${mapping#*:}
@@ -99,7 +98,6 @@ package() {
     fi
   done
   rmdir "$pkgdir/etc/security" 2>/dev/null || true
-  rmdir "$pkgdir/etc/cups" 2>/dev/null || true
   rmdir "$pkgdir/etc/plymouth" 2>/dev/null || true
 
   # User services are vendor units, while ~/.config/systemd/user remains

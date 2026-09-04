@@ -8,11 +8,6 @@ _monarch_etc_overrides_apply() {
   cp -f /usr/share/monarch/etc-overrides/plymouth-plymouthd.conf /etc/plymouth/plymouthd.conf
   cp -f /usr/share/monarch/etc-overrides/dot.bashrc /etc/skel/.bashrc
 
-  if [[ -f /etc/cups/cups-browsed.conf ]]; then
-    cp -f /usr/share/monarch/etc-overrides/cups-cups-browsed.conf /etc/cups/cups-browsed.conf
-    chmod 0644 /etc/cups/cups-browsed.conf
-  fi
-
   chmod 0644 /etc/os-release /etc/security/faillock.conf /etc/nsswitch.conf \
     /etc/plymouth/plymouthd.conf /etc/skel/.bashrc
 }
