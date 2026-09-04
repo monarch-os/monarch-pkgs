@@ -1,13 +1,68 @@
+ASDCONTROL_SYS_CLASS=/sys/class/usbmisc
+ASDCONTROL_SYS_DEVICES=/sys/devices
+ASDCONTROL_DEV_ROOT=/dev
+ASDCONTROL_UDEVADM=/usr/bin/udevadm
+ASDCONTROL_READLINK=/usr/bin/readlink
+ASDCONTROL_CHMOD=/usr/bin/chmod
+ASDCONTROL_SHA256SUM=/usr/bin/sha256sum
+ASDCONTROL_RM=/usr/bin/rm
+ASDCONTROL_FACTORY_RULE=/etc/udev/rules.d/70-monarch-asdcontrol.rules
+ASDCONTROL_RULE_SHA256=d3eb4396825b3ac75e69caf1429268c38bb97e83f33451897cbc71523aa66e85
+
+remove_factory_fallback() {
+  local checksum
+
+  [[ -f $ASDCONTROL_FACTORY_RULE && ! -L $ASDCONTROL_FACTORY_RULE ]] || return 0
+  checksum=$("$ASDCONTROL_SHA256SUM" "$ASDCONTROL_FACTORY_RULE" 2>/dev/null) || return 0
+  [[ ${checksum%% *} == "$ASDCONTROL_RULE_SHA256" ]] || return 0
+  "$ASDCONTROL_RM" -f -- "$ASDCONTROL_FACTORY_RULE"
+}
+
+refresh_hiddev_access() {
+  "$ASDCONTROL_UDEVADM" control --reload 2>/dev/null || true
+  "$ASDCONTROL_UDEVADM" trigger --subsystem-match=usbmisc \
+    --sysname-match='hiddev*' --action=change --settle 2>/dev/null || true
+}
+
+supported_hiddev_nodes() {
+  local sysdev parent vendor product devname
+
+  for sysdev in "$ASDCONTROL_SYS_CLASS"/hiddev*; do
+    [[ -e $sysdev ]] || continue
+    parent=$("$ASDCONTROL_READLINK" -f "$sysdev") || continue
+    while [[ $parent == "$ASDCONTROL_SYS_DEVICES"/* ]]; do
+      if [[ -r $parent/idVendor && -r $parent/idProduct ]]; then
+        read -r vendor <"$parent/idVendor"
+        read -r product <"$parent/idProduct"
+        if [[ $vendor == 05ac && $product =~ ^(1114|1116|1118|9243)$ ]]; then
+          devname=$("$ASDCONTROL_UDEVADM" info --query=name --path="$sysdev") || continue
+          [[ $devname =~ ^(usb/)?hiddev[0-9]+$ ]] || continue
+          printf '%s/%s\n' "$ASDCONTROL_DEV_ROOT" "$devname"
+        fi
+        break
+      fi
+      parent=${parent%/*}
+    done
+  done
+}
+
 post_install() {
-  echo ":: asdcontrol has been installed"
-  echo ":: You can now use 'sudo asdcontrol' to control Apple Display brightness"
-  echo ":: Passwordless sudo has been configured for /usr/bin/asdcontrol"
+  remove_factory_fallback
+  refresh_hiddev_access
 }
 
 post_upgrade() {
-  post_install
+  remove_factory_fallback
+  refresh_hiddev_access
 }
 
 post_remove() {
-  echo ":: Sudoers configuration for asdcontrol has been removed"
+  local node
+
+  remove_factory_fallback
+  refresh_hiddev_access
+  while IFS= read -r node; do
+    [[ -c $node || -e $node ]] || continue
+    "$ASDCONTROL_CHMOD" 0600 "$node" 2>/dev/null || true
+  done < <(supported_hiddev_nodes)
 }

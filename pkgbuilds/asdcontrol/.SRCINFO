@@ -1,7 +1,7 @@
 pkgbase = asdcontrol
 	pkgdesc = Control brightness on Apple Displays connected via USB-C
 	pkgver = 0.6.0
-	pkgrel = 1
+	pkgrel = 2
 	epoch = 1
 	url = https://github.com/omakasui/asdcontrol
 	install = asdcontrol.install
@@ -13,6 +13,8 @@ pkgbase = asdcontrol
 	depends = gcc-libs
 	options = !debug
 	source = asdcontrol-0.6.0.tar.gz::https://github.com/omakasui/asdcontrol/archive/refs/tags/v0.6.0.tar.gz
+	source = 70-asdcontrol.rules
 	sha256sums = 3112a6d5fc51a204c96ef9d27187577c6efc80b952e37a77969efbd0124e81d3
+	sha256sums = d3eb4396825b3ac75e69caf1429268c38bb97e83f33451897cbc71523aa66e85
 
 pkgname = asdcontrol
