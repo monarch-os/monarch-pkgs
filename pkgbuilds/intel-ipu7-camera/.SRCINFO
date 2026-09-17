@@ -1,7 +1,7 @@
 pkgbase = intel-ipu7-camera
 	pkgdesc = Intel IPU7 MIPI camera stack for Hurrican/Performance (OV08X40 + hardware ISP)
-	pkgver = 1.0.3
-	pkgrel = 4
+	pkgver = 1.0.6
+	pkgrel = 2
 	url = https://github.com/TsaiGaggery/hurrican_omarchy_enabling
 	install = intel-ipu7-camera.install
 	arch = x86_64
@@ -14,7 +14,6 @@ pkgbase = intel-ipu7-camera
 	makedepends = libtool
 	makedepends = pkgconf
 	depends = dkms
-	depends = linux-headers
 	depends = v4l2loopback-dkms
 	depends = v4l2-relayd
 	depends = gstreamer
@@ -29,9 +28,18 @@ pkgbase = intel-ipu7-camera
 	source = ipu7-camera-bins::git+https://github.com/intel/ipu7-camera-bins.git#commit=403c67db6b279dd02752f11db6a34552f31a3ac5
 	source = ipu7-camera-hal::git+https://github.com/intel/ipu7-camera-hal.git#commit=b1f6ebef12111fb5da0133b144d69dd9b001836c
 	source = icamerasrc::git+https://github.com/intel/icamerasrc.git#commit=4fb31db76b618aae72184c59314b839dedb42689
+	source = intel-cvs-core.c::https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/drivers/media/i2c/cvs/core.c?h=v7.2.5
+	source = intel-cvs-v4l2.c::https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/drivers/media/i2c/cvs/v4l2.c?h=v7.2.5
+	source = intel-cvs-icvs.h::https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/drivers/media/i2c/cvs/icvs.h?h=v7.2.5
+	source = 0004-ipu7-psys-register-device-bus.patch
 	source = 0003-icvs-set-rgbcamera_pwrup_host-0-for-Panther-Lake.patch
+	source = 0005-camhal-MediaControl-route-through-Intel-CVS-bridge.patch
+	source = 0006-camhal-ipu75xa-ov08x40-Intel-CVS-formats.patch
+	source = 0007-media-i2c-cvs-get-the-wake-irq-without-claiming-the-gpio.patch
 	source = dkms-ipu7-drivers.conf
 	source = dkms-vision-drivers.conf
+	source = dkms-intel-cvs.conf
+	source = intel-cvs-Makefile
 	source = camera-deps.conf
 	source = v4l2loopback-modprobe.conf
 	source = camera-init.service
@@ -45,6 +53,15 @@ pkgbase = intel-ipu7-camera
 	source = camera-sleep-hook
 	source = v4l2-relayd-ipu7.conf
 	source = v4l2-relayd-ipu7-override.conf
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = b4a90ad1815c02e4cadc1b5ad6c576ae0b150cb365c68d2c934cf964a995d91f
+	sha256sums = e988014f54b1b5183e9ef43b602d73bbc2c991f19a8d503560a8cdba112b76c6
+	sha256sums = 6dcd5201fb78766a440038c8eba2cc8c3892064ba829065e2269c30dc1905983
+	sha256sums = SKIP
 	sha256sums = SKIP
 	sha256sums = SKIP
 	sha256sums = SKIP
