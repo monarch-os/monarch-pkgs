@@ -1,4 +1,6 @@
 {
   "source": "local",
-  "release_ring": "fast"
+  "build_env": {
+    "ZENITH_USE_CUDA": "1"
+  }
 }

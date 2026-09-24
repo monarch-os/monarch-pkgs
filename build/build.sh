@@ -196,7 +196,12 @@ build_package() {
   # replacement prompts are auto-accepted instead of aborting the build.
   MAKEPKG_FLAGS="-scf --noconfirm"
 
-  if PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
+  local -a build_env=()
+  if [[ -f .monarch/package.json ]]; then
+    mapfile -t build_env < <(jq -r '.build_env // {} | to_entries[] | "\(.key)=\(.value)"' .monarch/package.json)
+  fi
+
+  if env "${build_env[@]}" PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
     done
