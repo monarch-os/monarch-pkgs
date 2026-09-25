@@ -1,6 +1,3 @@
 {
-  "source": "local",
-  "build_env": {
-    "ZENITH_USE_CUDA": "1"
-  }
+  "source": "local"
 }
