@@ -114,6 +114,8 @@ package() {
     "$pkgdir/usr/lib/systemd/user/monarch-obsidian-theme.service"
   install -Dm644 default/systemd/user/monarch-recover-internal-monitor.service \
     "$pkgdir/usr/lib/systemd/user/monarch-recover-internal-monitor.service"
+  install -Dm644 default/systemd/user/monarch-screencast-dnd.service \
+    "$pkgdir/usr/lib/systemd/user/monarch-screencast-dnd.service"
 
   # The suspend hook is system-wide even though its source lives with the
   # other Monarch defaults.
