@@ -1,6 +1,6 @@
 pkgname=monarch-settings
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Monarch system and user defaults"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
@@ -160,4 +160,6 @@ package() {
 
   install -Dm644 default/snapper/root "$pkgdir/etc/snapper/config-templates/monarch"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/monarch-settings/LICENSE"
+
+  find "$pkgdir" \( -type d -o -type f \) -exec chmod go-w {} +
 }
