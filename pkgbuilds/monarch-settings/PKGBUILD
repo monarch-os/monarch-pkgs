@@ -155,11 +155,17 @@ package() {
 
   install -d "$pkgdir/usr/share/plymouth/themes/monarch"
   cp -a default/plymouth/. "$pkgdir/usr/share/plymouth/themes/monarch/"
-  find "$pkgdir/usr/share/plymouth/themes/monarch" -type d -exec chmod 0755 {} +
-  find "$pkgdir/usr/share/plymouth/themes/monarch" -type f -exec chmod 0644 {} +
 
   install -Dm644 default/snapper/root "$pkgdir/etc/snapper/config-templates/monarch"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/monarch-settings/LICENSE"
 
-  find "$pkgdir" \( -type d -o -type f \) -exec chmod go-w {} +
+  chmod 0755 "$pkgdir/usr/share/monarch/default"
+  for theme_dir in \
+    "$pkgdir/usr/share/monarch/default/plymouth" \
+    "$pkgdir/usr/share/monarch/default/sddm" \
+    "$pkgdir/usr/share/plymouth/themes/monarch" \
+    "$pkgdir/usr/share/sddm/themes/monarch"; do
+    find "$theme_dir" -type d -exec chmod 0755 {} +
+    find "$theme_dir" -type f -exec chmod 0644 {} +
+  done
 }
