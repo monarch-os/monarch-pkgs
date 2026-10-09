@@ -1,0 +1,11 @@
+diff --git a/PKGBUILD b/PKGBUILD
+--- a/PKGBUILD
++++ b/PKGBUILD
+@@ -1 +1 @@
+-pkgname=openchamber-desktop-appimage
++pkgname=openchamber-desktop
+@@ -9 +9,3 @@
+-depends=('fuse2')
++depends=('fuse2')
++provides=("openchamber-desktop-appimage=${pkgver}")
++conflicts=('openchamber-desktop-appimage')

@@ -1,0 +1,5 @@
+{
+  "source": "aur",
+  "aur": "openchamber-desktop-appimage",
+  "upstream_commit": "ee63db76f505cff42db36f92bd471efdab588742"
+}
