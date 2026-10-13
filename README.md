@@ -57,6 +57,12 @@ bin/repo build --arch aarch64                    # ARM64
 
 **Output**: Unsigned `.pkg.tar.zst` in `build-output/`
 
+For VCS recipes, the builder resolves `pkgver()` before packaging, restores the
+recipe's declared `pkgrel`, and builds the same prepared sources with
+`--noextract`. This prevents makepkg's automatic reset to `pkgrel=1` from
+rebuilding an already published version indefinitely. Non-VCS recipes keep the
+normal single-pass build.
+
 ### Sign
 
 ```bash
@@ -73,7 +79,25 @@ bin/repo promote --arch aarch64     # ARM64
 bin/repo promote --dry-run          # Preview
 ```
 
-Copies signed packages from `build-output/` → `pkgs.omarchy.org/`.
+Moves signed packages from `build-output/<arch>/` to
+`pkgs.monarchlinux.com/<arch>/` without overwriting published files.
+
+An already published archive is skipped only when its bytes are identical and
+its published signature exists. The original archive and signature are retained,
+even if the staged archive was re-signed. Different archive contents under the
+same filename stop the entire batch before any package is promoted: bump the
+recipe's `pkgrel` instead. Local promotions sharing a build directory are locked
+against overlap.
+
+Regression checks (run the makepkg test on an Arch host with makepkg, fakeroot
+and bsdtar; it does not install dependencies):
+
+```bash
+bash test/makepkg-pkgrel-test.sh
+bash test/promote-build-test.sh
+bash test/monarch-version-test.sh
+bash test/monarch-vcs-skip-test.sh
+```
 
 ### Clean
 

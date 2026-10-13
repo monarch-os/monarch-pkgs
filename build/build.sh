@@ -34,6 +34,12 @@ else
   echo "==> WARNING: package-metadata.sh not found; VCS rebuild-skip disabled"
 fi
 
+if [[ -z $HELPERS_DIR || ! -f $HELPERS_DIR/makepkg-build.sh ]]; then
+  echo "==> ERROR: makepkg-build.sh not found; refusing to build with inconsistent pkgrel"
+  exit 1
+fi
+source "$HELPERS_DIR/makepkg-build.sh"
+
 # Configure Monarch repositories for dependency resolution
 echo "==> Configuring Monarch repositories for dependency resolution..."
 
@@ -196,7 +202,7 @@ build_package() {
   # replacement prompts are auto-accepted instead of aborting the build.
   MAKEPKG_FLAGS="-scf --noconfirm"
 
-  if PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
+  if PACMAN=/usr/local/bin/pacman-for-makepkg build_with_makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
     done

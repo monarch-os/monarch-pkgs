@@ -72,6 +72,12 @@ else
   echo ""
   mkdir -p "$REPO_DIR"
 
+  exec {promote_lock}<"$BUILD_OUTPUT_DIR"
+  if ! flock -n "$promote_lock"; then
+    print_error "Another promotion is already using this build directory."
+    exit 1
+  fi
+
   echo "==> Verifying all packages have signatures..."
   MISSING_SIGS=()
   for pkg_file in *.pkg.tar.*; do
@@ -80,6 +86,11 @@ else
     [[ "$pkg_file" == monarch-build.files* ]] && continue
     [[ "$pkg_file" == *.sig ]] && continue
     [[ ! -f "$pkg_file" ]] && continue
+
+    if [[ -L $pkg_file || -L $pkg_file.sig ]]; then
+      print_error "Refusing a symbolic package or signature: $pkg_file"
+      exit 1
+    fi
 
     if [[ ! -f "$pkg_file.sig" ]]; then
       MISSING_SIGS+=("$pkg_file")
@@ -102,38 +113,53 @@ else
 
   echo "==> Checking for existing files in production..."
   CONFLICTS=()
+  ALREADY_PUBLISHED=()
+  TO_PROMOTE=()
   for pkg_file in *.pkg.tar.*; do
     [[ "$pkg_file" == monarch-build.db* ]] && continue
     [[ "$pkg_file" == monarch-build.files* ]] && continue
+    [[ "$pkg_file" == *.sig ]] && continue
     [[ ! -f "$pkg_file" ]] && continue
 
-    if [[ -f "$REPO_DIR/$pkg_file" ]]; then
-      CONFLICTS+=("$pkg_file")
+    if [[ -e $REPO_DIR/$pkg_file || -L $REPO_DIR/$pkg_file ]]; then
+      if [[ -f $REPO_DIR/$pkg_file && ! -L $REPO_DIR/$pkg_file ]] &&
+        cmp -s -- "$pkg_file" "$REPO_DIR/$pkg_file"; then
+        if [[ -f $REPO_DIR/$pkg_file.sig && ! -L $REPO_DIR/$pkg_file.sig ]]; then
+          ALREADY_PUBLISHED+=("$pkg_file")
+        else
+          CONFLICTS+=("$pkg_file (published signature is missing or unsafe)")
+        fi
+      else
+        CONFLICTS+=("$pkg_file (different contents or unsafe destination)")
+      fi
+    elif [[ -e $REPO_DIR/$pkg_file.sig || -L $REPO_DIR/$pkg_file.sig ]]; then
+      CONFLICTS+=("$pkg_file.sig (signature exists without its package)")
+    else
+      TO_PROMOTE+=("$pkg_file" "$pkg_file.sig")
     fi
   done
 
   if [[ ${#CONFLICTS[@]} -gt 0 ]]; then
     echo ""
-    print_error "ERROR: The following packages already exist in production:"
+    print_error "ERROR: The following packages conflict with production:"
     for conflict in "${CONFLICTS[@]}"; do
       echo "  - $conflict"
     done
     echo ""
-    print_error "Packages already exist in pkgs.monarchlinux.com!"
+    print_error "Refusing to overwrite published files. Bump pkgrel for changed package contents."
     exit 1
   fi
 
-  # Move all package files (excluding build database)
-  # Using mv instead of cp avoids filesystem sync issues and is atomic
+  for pkg_file in "${ALREADY_PUBLISHED[@]}"; do
+    print_info "Already published with identical contents: $pkg_file"
+    # Re-signing identical bytes can change the signature; keep the published pair.
+    rm -- "$pkg_file" "$pkg_file.sig"
+  done
+
   print_info "Moving packages to production..."
   MOVED=0
-  for pkg_file in *.pkg.tar.*; do
-    # Skip build database files
-    [[ "$pkg_file" == monarch-build.db* ]] && continue
-    [[ "$pkg_file" == monarch-build.files* ]] && continue
-    [[ ! -f "$pkg_file" ]] && continue
-
-    if mv -v "$pkg_file" "$REPO_DIR/"; then
+  for pkg_file in "${TO_PROMOTE[@]}"; do
+    if mv -v -T --no-clobber -- "$pkg_file" "$REPO_DIR/$pkg_file" && [[ ! -e $pkg_file ]]; then
       MOVED=$((MOVED + 1))
     else
       print_error "Failed to move $pkg_file"
