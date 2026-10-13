@@ -297,6 +297,13 @@ check_vcs_unchanged() {
   [[ "$pkgbuild_epoch" != "$prod_epoch" ]] && return 1
   [[ "$pkgbuild_pkgrel" != "$prod_pkgrel" ]] && return 1
 
+  if [[ $pkg == "monarch" ]]; then
+    local source_version
+    source_version=$(package_monarch_source_version "$pkgdir") || return 1
+    [[ ${prod_no_pkgrel#*:} == "$source_version" ]]
+    return
+  fi
+
   local prod_hash=$(package_extract_vcs_hash_from_version "$local_version")
   [[ -z "$prod_hash" ]] && return 1
 
@@ -322,7 +329,10 @@ check_needs_build() {
 
   # VCS-aware path (only when the metadata helper is available).
   if [[ "$METADATA_HELPERS" == true ]] && grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild"; then
-    if [[ -n "$local_version" && -n "$(package_extract_vcs_hash_from_version "$local_version")" ]]; then
+    if [[ -n "$local_version" ]] && {
+      [[ -n "$(package_extract_vcs_hash_from_version "$local_version")" ]] ||
+        { [[ $pkg == "monarch" ]] && package_calver_tag_from_version "$local_version" >/dev/null; }
+    }; then
       if check_vcs_unchanged "$pkg"; then
         return 1  # upstream ref already represented in the repo
       else

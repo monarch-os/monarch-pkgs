@@ -1,6 +1,6 @@
 pkgname=monarch
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Monarch desktop runtime"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
@@ -23,6 +23,8 @@ depends=(
   'gum'
   'jq'
   'git'
+  'pacman-contrib'
+  'fakeroot'
 )
 makedepends=('git')
 if [[ -n ${MONARCH_SRC:-} ]]; then
@@ -35,9 +37,15 @@ fi
 
 pkgver() {
   cd "$srcdir/monarch"
-  if [[ -d .git ]]; then
-    git describe --long --tags 2>/dev/null | sed 's/^v//;s/-/.r/;s/-/./' ||
+  if [[ -e .git ]]; then
+    local description tag
+    tag=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-version:refname |
+      awk '/^v[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$/ && !found { print; found=1 }')
+    if [[ -n $tag ]] && description=$(git describe --tags --match "$tag" 2>/dev/null); then
+      printf '%s\n' "$description" | sed 's/^v//;s/-/.r/;s/-/./'
+    else
       printf '0.r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+    fi
   else
     tr -cd '0-9A-Za-z._+' <version
   fi
@@ -55,8 +63,12 @@ package() {
   install -d "$pkgdir/usr/share/monarch" "$pkgdir/usr/bin"
   cp -r "$srcdir/monarch"/{assets,bin,install,themes} \
     "$pkgdir/usr/share/monarch/"
-  cp "$srcdir/monarch"/{LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt,version} \
+  cp "$srcdir/monarch"/{LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt} \
     "$pkgdir/usr/share/monarch/"
+  printf '%s\n' "$pkgver" >"$pkgdir/usr/share/monarch/version"
+  if [[ -e $srcdir/monarch/.git ]]; then
+    git -C "$srcdir/monarch" rev-parse HEAD >"$pkgdir/usr/share/monarch/revision"
+  fi
 
   find "$pkgdir/usr/share/monarch/bin" -maxdepth 1 -type f \
     \( -name monarch -o -name 'monarch-*' \) -print0 |
