@@ -127,7 +127,6 @@ package_first_git_source() {
     done')
 }
 
-# The optional source fragment resolves a published tag instead of the tracked ref.
 package_git_upstream_hash() {
   local pkgdir="$1"
   local source_spec source_url fragment ref hash
@@ -140,7 +139,6 @@ package_git_upstream_hash() {
   if [[ "$source_spec" == *"#"* ]]; then
     fragment="${source_spec#*#}"
   fi
-  fragment="${2:-$fragment}"
 
   case "$fragment" in
     "")
@@ -181,20 +179,32 @@ package_calver_tag_from_version() {
   printf 'v%s\n' "$version"
 }
 
-package_git_calver_tag_at_hash() {
-  local pkgdir="$1" hash="$2" source_spec refs
+package_monarch_source_version() (
+  local pkgdir="$1" source_spec source_url fragment ref tmp
   source_spec=$(package_first_git_source "$pkgdir") || return 1
   [[ -n $source_spec ]] || return 1
-  refs=$(git ls-remote "${source_spec%%#*}" 'refs/tags/v*' 2>/dev/null) || return 1
-  printf '%s\n' "$refs" | awk -v hash="$hash" '
-    index($1, hash) == 1 {
-      tag=$2
-      sub(/^refs\/tags\//, "", tag)
-      sub(/\^\{\}$/, "", tag)
-      if (tag ~ /^v[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$/) print tag
-    }
-  ' | sort -V | tail -n 1
-}
+  source_url="${source_spec%%#*}"
+  fragment=""
+  [[ $source_spec != *"#"* ]] || fragment="${source_spec#*#}"
+  case "$fragment" in
+    "") ref=HEAD ;;
+    branch=*) ref="refs/heads/${fragment#branch=}" ;;
+    tag=*) ref="refs/tags/${fragment#tag=}" ;;
+    commit=*) ref="${fragment#commit=}" ;;
+    *) return 1 ;;
+  esac
+
+  tmp=$(mktemp -d) || return 1
+  trap 'rm -rf -- "$tmp"' EXIT
+  git init --quiet --initial-branch=monarch-check "$tmp/monarch" || return 1
+  # Only commit ancestry and tag metadata are needed; do not download desktop assets.
+  git -C "$tmp/monarch" fetch --quiet --filter=tree:0 "$source_url" \
+    "+$ref:refs/monarch/source" '+refs/tags/v*:refs/tags/v*' 2>/dev/null || return 1
+  git -C "$tmp/monarch" update-ref HEAD \
+    "$(git -C "$tmp/monarch" rev-parse 'refs/monarch/source^{commit}')" || return 1
+  cd "$pkgdir" || return 1
+  srcdir="$tmp" bash -c 'source PKGBUILD; pkgver'
+)
 
 validate_package_metadata() {
   local pkgdir="$1"

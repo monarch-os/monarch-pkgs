@@ -80,6 +80,27 @@ PUBLISHED_VERSION=4.0.4-2
 expect_build
 echo "Missing, malformed and legacy tags do not skip builds"
 
+git -C "$tmp/upstream" tag v2027.01.2 HEAD~1
+git -C "$tmp/upstream" tag v2027.01.1
+hash=$(git -C "$tmp/upstream" rev-parse --short=7 HEAD)
+PUBLISHED_VERSION="2027.01.2.r1.g$hash-2"
+expect_skip
+expect_skip
+echo "A lower HEAD tag does not override the greater reachable ancestor tag"
+
+git -C "$tmp/upstream" tag v2027.01.3 HEAD~1
+expect_build
+PUBLISHED_VERSION="2027.01.3.r1.g$hash-2"
+expect_skip
+echo "A new greater ancestor tag changes the source version even without a new commit"
+
+git -C "$tmp/upstream" checkout --quiet --orphan unrelated
+git -C "$tmp/upstream" commit --quiet --allow-empty -m Unrelated
+git -C "$tmp/upstream" tag v2029.01.0
+git -C "$tmp/upstream" checkout --quiet dev
+expect_skip
+echo "Higher tags on unrelated history do not affect the tracked source version"
+
 PUBLISHED_VERSION=2026.11.0-2
 mv "$tmp/upstream" "$tmp/unreachable"
 expect_build

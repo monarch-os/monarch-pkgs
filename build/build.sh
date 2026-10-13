@@ -297,24 +297,18 @@ check_vcs_unchanged() {
   [[ "$pkgbuild_epoch" != "$prod_epoch" ]] && return 1
   [[ "$pkgbuild_pkgrel" != "$prod_pkgrel" ]] && return 1
 
-  local prod_hash=$(package_extract_vcs_hash_from_version "$local_version")
-  if [[ -z $prod_hash && $pkg == "monarch" ]]; then
-    local prod_tag
-    prod_tag=$(package_calver_tag_from_version "$local_version") || return 1
-    prod_hash=$(package_git_upstream_hash "$pkgdir" "tag=$prod_tag")
+  if [[ $pkg == "monarch" ]]; then
+    local source_version
+    source_version=$(package_monarch_source_version "$pkgdir") || return 1
+    [[ ${prod_no_pkgrel#*:} == "$source_version" ]]
+    return
   fi
+
+  local prod_hash=$(package_extract_vcs_hash_from_version "$local_version")
   [[ -z "$prod_hash" ]] && return 1
 
   local upstream_hash=$(package_git_upstream_hash "$pkgdir")
   [[ -z "$upstream_hash" ]] && return 1
-
-  if [[ $pkg == "monarch" ]]; then
-    local current_tag
-    current_tag=$(package_git_calver_tag_at_hash "$pkgdir" "$upstream_hash") || return 1
-    if [[ -n $current_tag && ${prod_no_pkgrel#*:} != "${current_tag#v}" ]]; then
-      return 1
-    fi
-  fi
 
   [[ "$prod_hash" == "$upstream_hash" ]]
 }
