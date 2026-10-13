@@ -127,6 +127,7 @@ package_first_git_source() {
     done')
 }
 
+# The optional source fragment resolves a published tag instead of the tracked ref.
 package_git_upstream_hash() {
   local pkgdir="$1"
   local source_spec source_url fragment ref hash
@@ -139,6 +140,7 @@ package_git_upstream_hash() {
   if [[ "$source_spec" == *"#"* ]]; then
     fragment="${source_spec#*#}"
   fi
+  fragment="${2:-$fragment}"
 
   case "$fragment" in
     "")
@@ -170,6 +172,28 @@ package_git_upstream_hash() {
 
   [[ -n "$hash" ]] || return 1
   echo "$hash"
+}
+
+package_calver_tag_from_version() {
+  local version="${1%-*}"
+  version="${version#*:}"
+  [[ $version =~ ^[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$ ]] || return 1
+  printf 'v%s\n' "$version"
+}
+
+package_git_calver_tag_at_hash() {
+  local pkgdir="$1" hash="$2" source_spec refs
+  source_spec=$(package_first_git_source "$pkgdir") || return 1
+  [[ -n $source_spec ]] || return 1
+  refs=$(git ls-remote "${source_spec%%#*}" 'refs/tags/v*' 2>/dev/null) || return 1
+  printf '%s\n' "$refs" | awk -v hash="$hash" '
+    index($1, hash) == 1 {
+      tag=$2
+      sub(/^refs\/tags\//, "", tag)
+      sub(/\^\{\}$/, "", tag)
+      if (tag ~ /^v[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$/) print tag
+    }
+  ' | sort -V | tail -n 1
 }
 
 validate_package_metadata() {

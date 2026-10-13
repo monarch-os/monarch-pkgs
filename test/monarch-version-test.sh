@@ -17,6 +17,12 @@ git config user.email test@example.invalid
 git commit --quiet --allow-empty -m Initial
 
 [[ $(pkgver) == 0.r1.* ]] || { echo "Untagged Git fallback failed" >&2; exit 1; }
+git tag v4.0.4
+git tag v0.12.0
+git tag v9999.13.0
+git tag v9999.10.01
+git tag v9999.10.1-rc1
+[[ $(pkgver) == 0.r1.* ]] || { echo "Legacy or malformed tags are treated as CalVer" >&2; exit 1; }
 git tag v2026.10.0
 [[ $(pkgver) == "2026.10.0" ]] || { echo "Exact CalVer tag failed" >&2; exit 1; }
 git commit --quiet --allow-empty -m Update

@@ -39,7 +39,8 @@ pkgver() {
   cd "$srcdir/monarch"
   if [[ -e .git ]]; then
     local description tag
-    tag=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-version:refname | head -n 1)
+    tag=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-version:refname |
+      awk '/^v[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$/ && !found { print; found=1 }')
     if [[ -n $tag ]] && description=$(git describe --tags --match "$tag" 2>/dev/null); then
       printf '%s\n' "$description" | sed 's/^v//;s/-/.r/;s/-/./'
     else
