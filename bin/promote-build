@@ -124,6 +124,23 @@ else
   ALREADY_PUBLISHED=()
   TO_PROMOTE=()
   STAGED_CLEANUP=()
+  verify_recovery_signature() (
+    set -o pipefail
+    local verification_home
+    if [[ -n ${GPG_PRIVATE_KEY:-} ]]; then
+      verification_home=$(mktemp -d) || return 1
+      trap 'gpgconf --homedir "$verification_home" --kill gpg-agent >/dev/null 2>&1 || true; rm -rf -- "$verification_home"' EXIT
+      if ! printf '%s\n' "$GPG_PRIVATE_KEY" |
+        gpg --no-options --homedir "$verification_home" --batch --import; then
+        return 1
+      fi
+      gpg --no-options --homedir "$verification_home" --batch --no-auto-key-retrieve \
+        --verify "$1" "$2"
+    else
+      gpg --batch --no-auto-key-retrieve --verify "$1" "$2"
+    fi
+  )
+
   plan_signature_recovery() {
     local package="$1"
     if [[ ! -f $package.sig || -L $package.sig || ! -f $REPO_DIR/$package || -L $REPO_DIR/$package ]]; then
@@ -136,7 +153,7 @@ else
       return 1
     fi
     # Without a staged archive, the signature must prove which published bytes it covers.
-    if ! gpg --batch --no-auto-key-retrieve --verify "$package.sig" "$REPO_DIR/$package" >/dev/null 2>&1; then
+    if ! verify_recovery_signature "$package.sig" "$REPO_DIR/$package" >/dev/null 2>&1; then
       CONFLICTS+=("$package.sig (cannot verify against the published archive; check signature and signing key)")
       return 1
     fi

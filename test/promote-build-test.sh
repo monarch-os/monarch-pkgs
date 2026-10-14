@@ -10,6 +10,7 @@ cleanup() {
 }
 trap cleanup EXIT
 export GNUPGHOME="$tmp/gnupg"
+unset GPG_PRIVATE_KEY
 mkdir -m 0700 "$GNUPGHOME"
 fixture="$tmp/repo"
 mkdir -p "$fixture/bin" "$fixture/helpers" "$fixture/build-output/x86_64" \
@@ -182,3 +183,43 @@ bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
 [[ $(stat -c '%i:%Y' "$published/$recovery.sig") == "$signature_before" ]]
 [[ ! -e $build/$recovery.sig ]]
 echo "PASS: a signature-only replay preserves an already completed published pair"
+
+workflow_key=$(gpg --batch --armor --export-secret-keys)
+mkdir "$tmp/verification-tmp"
+rm "$published/$recovery.sig"
+cp "$tmp/expected.sig" "$build/$recovery.sig"
+if ! TMPDIR="$tmp/verification-tmp" GNUPGHOME="$tmp/empty-keyring" GPG_PRIVATE_KEY="$workflow_key" \
+  bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1; then
+  cat "$tmp/output"
+  echo "FAIL: workflow signing key must support recovery without a host public key" >&2
+  exit 1
+fi
+[[ $(stat -c '%i:%Y' "$published/$recovery") == "$before" ]]
+cmp -- "$published/$recovery.sig" "$tmp/expected.sig"
+[[ ! -e $build/$recovery.sig ]]
+[[ -z $(find "$tmp/verification-tmp" -mindepth 1 -print -quit) ]]
+[[ -z $(GNUPGHOME="$tmp/empty-keyring" gpg --batch --with-colons --list-keys 2>/dev/null | grep '^pub:' || true) ]]
+[[ -z $(GNUPGHOME="$tmp/empty-keyring" gpg --batch --with-colons --list-secret-keys 2>/dev/null | grep '^sec:' || true) ]]
+echo "PASS: workflow-key recovery leaves the host public and private keyrings untouched"
+
+rm "$published/$recovery.sig"
+cp "$tmp/expected.sig" "$build/$recovery.sig"
+status=0
+TMPDIR="$tmp/verification-tmp" GNUPGHOME="$tmp/empty-keyring" GPG_PRIVATE_KEY='invalid key' \
+  bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1 || status=$?
+((status != 0))
+[[ -f $build/$recovery.sig && ! -e $published/$recovery.sig ]]
+[[ -z $(find "$tmp/verification-tmp" -mindepth 1 -print -quit) ]]
+echo "PASS: invalid workflow keys fail before publication and preserve the staged signature"
+
+gpg --batch --pinentry-mode loopback --passphrase '' \
+  --quick-generate-key 'Other signing key <other@example.invalid>' ed25519 sign 0 \
+  >"$tmp/gpg-output" 2>&1
+other_key=$(gpg --batch --armor --export 'other@example.invalid')
+status=0
+TMPDIR="$tmp/verification-tmp" GPG_PRIVATE_KEY="$other_key" \
+  bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1 || status=$?
+((status != 0))
+[[ -f $build/$recovery.sig && ! -e $published/$recovery.sig ]]
+[[ -z $(find "$tmp/verification-tmp" -mindepth 1 -print -quit) ]]
+echo "PASS: a different workflow key cannot fall back to the host signing key"
