@@ -1,6 +1,6 @@
 pkgname=monarch
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Monarch desktop runtime"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
@@ -8,6 +8,7 @@ license=('MIT')
 depends=(
   'monarch-settings'
   'bash'
+  'python'
   'limine'
   'limine-mkinitcpio-hook'
   'limine-snapper-sync'
@@ -80,4 +81,6 @@ package() {
   install -Dm644 "$srcdir/monarch/default/libalpm/hooks/00-monarch-update-guard.hook" \
     "$pkgdir/usr/share/libalpm/hooks/00-monarch-update-guard.hook"
   install -Dm644 "$srcdir/monarch/LICENSE" "$pkgdir/usr/share/licenses/monarch/LICENSE"
+
+  find "$pkgdir" \( -type d -o -type f \) -perm /0022 -exec chmod go-w {} +
 }
