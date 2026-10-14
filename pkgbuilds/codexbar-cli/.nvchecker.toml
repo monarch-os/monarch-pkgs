@@ -1,5 +1,0 @@
-[codexbar-cli]
-source = "github"
-github = "steipete/CodexBar"
-use_latest_release = true
-prefix = "v"
