@@ -15,6 +15,10 @@ git -C "$tmp/upstream" commit --quiet --allow-empty -m Initial
 git -C "$tmp/upstream" tag v2026.10.0
 sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
   "$ROOT/pkgbuilds/monarch/PKGBUILD" >"$PKGBUILDS_DIR/monarch/PKGBUILD"
+mkdir -p "$PKGBUILDS_DIR/monarch-settings"
+cp "$ROOT/pkgbuilds/monarch-settings/monarch-settings.install" "$PKGBUILDS_DIR/monarch-settings/"
+sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
+  "$ROOT/pkgbuilds/monarch-settings/PKGBUILD" >"$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
 
 source "$ROOT/helpers/package-metadata.sh"
 source "$ROOT/helpers/makepkg-build.sh"
@@ -26,17 +30,23 @@ for function in check_vcs_unchanged check_needs_build; do
 done
 
 expect_skip() {
-  if check_needs_build monarch; then
-    echo "Unchanged Monarch package was scheduled for rebuilding: $PUBLISHED_VERSION" >&2
-    exit 1
-  fi
+  local package
+  for package in monarch monarch-settings; do
+    if check_needs_build "$package"; then
+      echo "Unchanged $package was scheduled for rebuilding: $PUBLISHED_VERSION" >&2
+      exit 1
+    fi
+  done
 }
 
 expect_build() {
-  if ! check_needs_build monarch; then
-    echo "Changed or unverifiable Monarch package was skipped: $PUBLISHED_VERSION" >&2
-    exit 1
-  fi
+  local package
+  for package in monarch monarch-settings; do
+    if ! check_needs_build "$package"; then
+      echo "Changed or unverifiable $package was skipped: $PUBLISHED_VERSION" >&2
+      exit 1
+    fi
+  done
 }
 
 PUBLISHED_VERSION=2026.10.0-2
@@ -53,14 +63,18 @@ expect_build
 PUBLISHED_VERSION=1:2026.11.0-2
 expect_build
 printf '\nepoch=1\n' >>"$PKGBUILDS_DIR/monarch/PKGBUILD"
+printf '\nepoch=1\n' >>"$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
 expect_skip
 sed -i '/^epoch=1$/d' "$PKGBUILDS_DIR/monarch/PKGBUILD"
+sed -i '/^epoch=1$/d' "$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
 echo "Package release and epoch changes still trigger rebuilding"
 
 git -C "$tmp/upstream" commit --quiet --allow-empty -m Update
 PUBLISHED_VERSION=2026.11.0-2
 expect_build
 hash=$(git -C "$tmp/upstream" rev-parse --short=7 HEAD)
+PUBLISHED_VERSION="1.0.0.r39.g$hash-2"
+expect_build
 PUBLISHED_VERSION="2026.11.0.r1.g$hash-2"
 expect_skip
 git -C "$tmp/upstream" tag v2026.12.0
