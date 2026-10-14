@@ -4,7 +4,13 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 tmp=$(mktemp -d)
-trap 'rm -rf -- "$tmp"' EXIT
+cleanup() {
+  gpgconf --homedir "$tmp/gnupg" --kill gpg-agent >/dev/null 2>&1 || true
+  rm -rf -- "$tmp"
+}
+trap cleanup EXIT
+export GNUPGHOME="$tmp/gnupg"
+mkdir -m 0700 "$GNUPGHOME"
 fixture="$tmp/repo"
 mkdir -p "$fixture/bin" "$fixture/helpers" "$fixture/build-output/x86_64" \
   "$fixture/pkgs.monarchlinux.com/x86_64"
@@ -105,3 +111,74 @@ bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
 bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
 [[ $(<"$published/$next") == 'next package' ]]
 echo "PASS: a completed batch and its empty retry both succeed"
+
+gpg --batch --pinentry-mode loopback --passphrase '' \
+  --quick-generate-key 'Promotion regression <promotion@example.invalid>' ed25519 sign 0 \
+  >"$tmp/gpg-output" 2>&1
+recovery=recovery-1.0-1-any.pkg.tar.zst
+printf 'recovery package\n' >"$build/$recovery"
+gpg --batch --yes --pinentry-mode loopback --passphrase '' \
+  --detach-sign --output "$build/$recovery.sig" "$build/$recovery"
+cp "$build/$recovery.sig" "$tmp/expected.sig"
+mkdir "$tmp/tools"
+cat >"$tmp/tools/mv" <<'STUB'
+#!/bin/bash
+if [[ ${FAIL_SIGNATURE_MOVE:-0} == 1 && ${!#} == *.sig ]]; then
+  exit 73
+fi
+exec /usr/bin/mv "$@"
+STUB
+chmod +x "$tmp/tools/mv"
+status=0
+PATH="$tmp/tools:$PATH" FAIL_SIGNATURE_MOVE=1 bash "$fixture/bin/promote-build" \
+  >"$tmp/output" 2>&1 || status=$?
+((status != 0))
+[[ -f $published/$recovery && ! -e $published/$recovery.sig ]]
+[[ ! -e $build/$recovery && -f $build/$recovery.sig ]]
+before=$(stat -c '%i:%Y' "$published/$recovery")
+bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
+if [[ ! -f $published/$recovery.sig || -e $build/$recovery.sig ]]; then
+  cat "$tmp/output"
+  echo "FAIL: interrupted archive/signature moves must complete on a signature-only retry" >&2
+  exit 1
+fi
+[[ $(stat -c '%i:%Y' "$published/$recovery") == "$before" ]]
+cmp -- "$published/$recovery.sig" "$tmp/expected.sig"
+gpg --batch --verify "$published/$recovery.sig" "$published/$recovery" >"$tmp/gpg-output" 2>&1
+echo "PASS: a failed signature move is recovered cryptographically without replacing the published archive"
+
+rm "$published/$recovery.sig"
+cp "$published/$recovery" "$build/$recovery"
+cp "$tmp/expected.sig" "$build/$recovery.sig"
+bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
+[[ $(stat -c '%i:%Y' "$published/$recovery") == "$before" ]]
+[[ ! -e $build/$recovery && ! -e $build/$recovery.sig ]]
+cmp -- "$published/$recovery.sig" "$tmp/expected.sig"
+echo "PASS: an identical staged archive can repair its missing published signature"
+
+rm "$published/$recovery.sig"
+printf 'different signed payload\n' >"$tmp/wrong-payload"
+gpg --batch --yes --pinentry-mode loopback --passphrase '' \
+  --detach-sign --output "$build/$recovery.sig" "$tmp/wrong-payload"
+status=0
+bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1 || status=$?
+((status != 0))
+[[ -f $build/$recovery.sig && ! -e $published/$recovery.sig ]]
+[[ $(stat -c '%i:%Y' "$published/$recovery") == "$before" ]]
+echo "PASS: a signature for different archive bytes cannot repair production"
+
+cp "$tmp/expected.sig" "$build/$recovery.sig"
+mkdir -m 0700 "$tmp/empty-keyring"
+status=0
+GNUPGHOME="$tmp/empty-keyring" bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1 || status=$?
+((status != 0))
+[[ -f $build/$recovery.sig && ! -e $published/$recovery.sig ]]
+echo "PASS: recovery without the signing public key fails before publication"
+
+bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
+signature_before=$(stat -c '%i:%Y' "$published/$recovery.sig")
+cp "$tmp/expected.sig" "$build/$recovery.sig"
+bash "$fixture/bin/promote-build" >"$tmp/output" 2>&1
+[[ $(stat -c '%i:%Y' "$published/$recovery.sig") == "$signature_before" ]]
+[[ ! -e $build/$recovery.sig ]]
+echo "PASS: a signature-only replay preserves an already completed published pair"
