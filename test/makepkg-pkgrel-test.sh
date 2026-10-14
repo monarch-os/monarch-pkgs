@@ -29,12 +29,12 @@ pkgver() {
   printf '%s\n' "${RESOLVED_PKGVER:-1.0.0.r39.g8833f38}"
 }
 package() {
-  install -Dm644 /dev/null "$pkgdir/usr/share/monarch-settings-fixture/payload"
+  install -Dm644 "$srcdir/prepare-count" "$pkgdir/usr/share/monarch-settings-fixture/payload"
 }
 FIXTURE
 cp PKGBUILD "$tmp/template"
 
-flags=(--config "$tmp/makepkg.conf" --nodeps --nosign --noconfirm --force --clean)
+flags=(--config "$tmp/makepkg.conf" --nodeps --nosign --noconfirm -scf)
 build_with_makepkg "${flags[@]}" \
   >"$tmp/output" 2>&1
 package=$(find "$tmp/packages" -type f -name '*.pkg.tar.*' -print -quit)
