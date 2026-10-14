@@ -1,0 +1,24 @@
+pkgname=codexbar-cli
+pkgver=0.75.0
+pkgrel=1
+pkgdesc="AI coding provider usage and cost tracking CLI"
+arch=('x86_64' 'aarch64')
+url="https://github.com/steipete/CodexBar"
+license=('MIT')
+depends=('curl' 'sqlite' 'gcc-libs' 'glibc')
+options=('!strip')
+source=("LICENSE::$url/raw/v$pkgver/LICENSE")
+sha256sums=('14293556b79940745123d0160c71d27ed0e9fe9b8a848093f3ed78f4853caafe')
+source_x86_64=("$pkgname-$pkgver-x86_64.tar.gz::$url/releases/download/v$pkgver/CodexBarCLI-v$pkgver-linux-x86_64.tar.gz")
+source_aarch64=("$pkgname-$pkgver-aarch64.tar.gz::$url/releases/download/v$pkgver/CodexBarCLI-v$pkgver-linux-aarch64.tar.gz")
+sha256sums_x86_64=('7920c8e42a64aa5dc249bdb3a745e8ec91a062cb2668b78dc9266dfffa0d7ad7')
+sha256sums_aarch64=('6b63c3fefeb2ec59618fa8b5c8424ea734cda00648afd4e7dd397d1bc0c16d61')
+
+package() {
+  install -Dm755 CodexBarCLI "$pkgdir/usr/lib/codexbar/CodexBarCLI"
+  cp -a CodexBar_CodexBarCore.bundle "$pkgdir/usr/lib/codexbar/"
+  install -Dm644 VERSION "$pkgdir/usr/lib/codexbar/VERSION"
+  install -d "$pkgdir/usr/bin"
+  ln -s ../lib/codexbar/CodexBarCLI "$pkgdir/usr/bin/codexbar"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
