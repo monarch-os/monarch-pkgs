@@ -62,6 +62,8 @@ recipe's declared `pkgrel`, and builds the same prepared sources with
 `--noextract`. This prevents makepkg's automatic reset to `pkgrel=1` from
 rebuilding an already published version indefinitely. Non-VCS recipes keep the
 normal single-pass build.
+VCS detection loads the PKGBUILD as Bash, so function-keyword and indented
+`pkgver` declarations behave the same as `pkgver()` declarations.
 
 ### Sign
 

@@ -1,5 +1,14 @@
+pkgbuild_has_pkgver() {
+  local pkgbuild="$1"
+  (
+    cd -- "$(dirname -- "$pkgbuild")" || exit 1
+    bash -c 'unset -f pkgver; source "$1" && declare -F pkgver >/dev/null' \
+      _ "./$(basename -- "$pkgbuild")"
+  ) >/dev/null
+}
+
 build_with_makepkg() {
-  if ! grep -qE '^pkgver[[:space:]]*\(\)' PKGBUILD; then
+  if ! pkgbuild_has_pkgver PKGBUILD; then
     makepkg "$@"
     return
   fi

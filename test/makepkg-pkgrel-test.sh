@@ -32,6 +32,7 @@ package() {
   install -Dm644 /dev/null "$pkgdir/usr/share/monarch-settings-fixture/payload"
 }
 FIXTURE
+cp PKGBUILD "$tmp/template"
 
 flags=(--config "$tmp/makepkg.conf" --nodeps --nosign --noconfirm --force --clean)
 build_with_makepkg "${flags[@]}" \
@@ -91,3 +92,41 @@ cd "$tmp/fixture"
   [[ $(wc -l <"$calls") == 1 ]]
 )
 echo "PASS: source-resolution failures preserve their status and stop before packaging"
+
+unset RESOLVED_PKGVER
+for declaration in 'function pkgver {' 'function pkgver() {' '  pkgver() {' '  function pkgver() {'; do
+  mkdir -p "$tmp/alternate"
+  cd "$tmp/alternate"
+  sed "s/^pkgver() {/$declaration/" "$tmp/template" >PKGBUILD
+  previous_prepares=$(wc -l <"$PREPARE_RECORD")
+  build_with_makepkg "${flags[@]}" >"$tmp/output" 2>&1
+  package="$tmp/packages/monarch-settings-fixture-1.0.0.r39.g8833f38-2-any.pkg.tar.zst"
+  version=$(bsdtar -xOqf "$package" .PKGINFO | sed -n 's/^pkgver = //p')
+  if [[ $(bash -c 'source PKGBUILD; printf "%s" "$pkgrel"') != 2 || $version != '1.0.0.r39.g8833f38-2' ]]; then
+    cat "$tmp/output"
+    printf 'FAIL: alternate declaration bypassed pkgrel preservation: %s\n' "$declaration" >&2
+    exit 1
+  fi
+  (( $(wc -l <"$PREPARE_RECORD") == previous_prepares + 1 ))
+
+  sed "s/^pkgver() {/$declaration/" "$tmp/template" >"$tmp/fixture/PKGBUILD"
+  PUBLISHED_VERSION=$version
+  if check_needs_build fixture; then
+    printf 'FAIL: alternate declaration bypassed unchanged-build detection: %s\n' "$declaration" >&2
+    exit 1
+  fi
+done
+echo "PASS: function-keyword and indented declarations preserve pkgrel and skip unchanged nightly builds"
+
+(
+  pkgver() { :; }
+  export -f pkgver
+  if pkgbuild_has_pkgver "$tmp/static/PKGBUILD"; then
+    echo "FAIL: a static recipe inherited the caller's pkgver function" >&2
+    exit 1
+  fi
+  pkgrel=unchanged
+  pkgbuild_has_pkgver "$tmp/fixture/PKGBUILD"
+  [[ $pkgrel == 'unchanged' ]]
+)
+echo "PASS: declaration detection is isolated from inherited functions and caller variables"

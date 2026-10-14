@@ -285,7 +285,7 @@ check_vcs_unchanged() {
   local pkgdir="/pkgbuilds/$pkg"
   local pkgbuild="$pkgdir/PKGBUILD"
 
-  grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild" || return 1
+  pkgbuild_has_pkgver "$pkgbuild" || return 1
 
   local local_version=$(get_local_version "$pkg")
   [[ -z "$local_version" ]] && return 1
@@ -334,7 +334,7 @@ check_needs_build() {
   local local_version=$(get_local_version "$pkg")
 
   # VCS-aware path (only when the metadata helper is available).
-  if [[ "$METADATA_HELPERS" == true ]] && grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild"; then
+  if [[ "$METADATA_HELPERS" == true ]] && pkgbuild_has_pkgver "$pkgbuild"; then
     if [[ -n "$local_version" ]] && {
       [[ -n "$(package_extract_vcs_hash_from_version "$local_version")" ]] ||
         { [[ $pkg == "monarch" ]] && package_calver_tag_from_version "$local_version" >/dev/null; }

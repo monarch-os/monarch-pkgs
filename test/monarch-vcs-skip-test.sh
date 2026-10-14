@@ -17,6 +17,7 @@ sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
   "$ROOT/pkgbuilds/monarch/PKGBUILD" >"$PKGBUILDS_DIR/monarch/PKGBUILD"
 
 source "$ROOT/helpers/package-metadata.sh"
+source "$ROOT/helpers/makepkg-build.sh"
 METADATA_HELPERS=true
 get_local_version() { printf '%s\n' "$PUBLISHED_VERSION"; }
 for function in check_vcs_unchanged check_needs_build; do
