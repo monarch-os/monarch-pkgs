@@ -64,6 +64,9 @@ rebuilding an already published version indefinitely. Non-VCS recipes keep the
 normal single-pass build.
 VCS detection loads the PKGBUILD as Bash, so function-keyword and indented
 `pkgver` declarations behave the same as `pkgver()` declarations.
+Release/version metadata comes from `makepkg --printsrcinfo`, using the same
+configuration and target context as the build. Architecture-dependent releases
+are therefore preserved and compared consistently during unchanged-build checks.
 
 ### Sign
 

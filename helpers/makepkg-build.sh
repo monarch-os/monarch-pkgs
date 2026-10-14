@@ -7,14 +7,34 @@ pkgbuild_has_pkgver() {
   ) >/dev/null
 }
 
+pkgbuild_declared_version() {
+  local pkgbuild="$1" srcinfo
+  shift
+  srcinfo=$(
+    cd -- "$(dirname -- "$pkgbuild")" || exit 1
+    makepkg --printsrcinfo -p "./$(basename -- "$pkgbuild")" "$@"
+  ) || return
+  awk '
+    $1 == "epoch" && $2 == "=" { epoch=$3 }
+    $1 == "pkgver" && $2 == "=" { version=$3 }
+    $1 == "pkgrel" && $2 == "=" { release=$3 }
+    END {
+      if (version == "" || release == "") exit 1
+      if (epoch != "") printf "%s:", epoch
+      printf "%s-%s\n", version, release
+    }
+  ' <<<"$srcinfo"
+}
+
 build_with_makepkg() {
   if ! pkgbuild_has_pkgver PKGBUILD; then
     makepkg "$@"
     return
   fi
 
-  local declared_pkgrel
-  declared_pkgrel=$(bash -c 'source PKGBUILD; printf "%s" "$pkgrel"') || return 1
+  local declared_version declared_pkgrel
+  declared_version=$(pkgbuild_declared_version PKGBUILD "$@") || return
+  declared_pkgrel="${declared_version##*-}"
   if [[ ! $declared_pkgrel =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     printf 'Invalid declared pkgrel: %s\n' "$declared_pkgrel" >&2
     return 1

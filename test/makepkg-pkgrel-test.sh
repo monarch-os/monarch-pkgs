@@ -84,14 +84,31 @@ cd "$tmp/fixture"
   calls="$tmp/failed-source-calls"
   makepkg() {
     printf '%s\n' "$*" >>"$calls"
+    if [[ $1 == --printsrcinfo ]]; then
+      printf 'pkgbase = fixture\n\tpkgver = 0.1.0\n\tpkgrel = 2\n'
+      return 0
+    fi
     return 42
   }
   status=0
   build_with_makepkg --nodeps --noconfirm || status=$?
   ((status == 42))
-  [[ $(wc -l <"$calls") == 1 ]]
+  [[ $(wc -l <"$calls") == 2 ]]
 )
 echo "PASS: source-resolution failures preserve their status and stop before packaging"
+
+(
+  calls="$tmp/failed-metadata-calls"
+  makepkg() {
+    printf '%s\n' "$*" >>"$calls"
+    return 43
+  }
+  status=0
+  build_with_makepkg --nodeps --noconfirm || status=$?
+  ((status == 43))
+  [[ $(wc -l <"$calls") == 1 ]]
+)
+echo "PASS: makepkg metadata failures preserve their status and stop before resolving sources"
 
 unset RESOLVED_PKGVER
 for declaration in 'function pkgver {' 'function pkgver() {' '  pkgver() {' '  function pkgver() {'; do
@@ -130,3 +147,51 @@ echo "PASS: function-keyword and indented declarations preserve pkgrel and skip 
   [[ $pkgrel == 'unchanged' ]]
 )
 echo "PASS: declaration detection is isolated from inherited functions and caller variables"
+
+for target in x86_64 aarch64; do
+  (
+    unset CARCH
+    target_root="$tmp/target-$target"
+    mkdir -p "$target_root/packages" "$target_root/home"
+    export HOME="$target_root/home" XDG_CONFIG_HOME="$target_root/home/.config"
+    export MAKEPKG_CONF="$target_root/makepkg.conf"
+    cp "$tmp/makepkg.conf" "$MAKEPKG_CONF"
+    printf '\nCARCH=%q\nPKGDEST=%q\n' "$target" "$target_root/packages" >>"$MAKEPKG_CONF"
+    cd "$target_root"
+    cat >PKGBUILD <<'TARGET'
+fixture_pkgrel() {
+  case "${CARCH:-}" in
+    x86_64) echo 2 ;;
+    aarch64) echo 7 ;;
+    *) echo 99 ;;
+  esac
+}
+TARGET
+    sed 's/^pkgrel=.*/pkgrel=$(fixture_pkgrel)/' "$tmp/template" >>PKGBUILD
+    cp PKGBUILD "$target_root/declared.PKGBUILD"
+    if ! build_with_makepkg --config "$MAKEPKG_CONF" --nodeps --nosign --noconfirm --force --clean \
+      >"$tmp/output" 2>&1; then
+      cat "$tmp/output"
+      exit 1
+    fi
+    expected_release=2
+    [[ $target != aarch64 ]] || expected_release=7
+    package=$(find "$target_root/packages" -type f -name '*.pkg.tar.*' -print -quit)
+    version=$(bsdtar -xOqf "$package" .PKGINFO | sed -n 's/^pkgver = //p')
+    if [[ $version != "1.0.0.r39.g8833f38-$expected_release" ]]; then
+      cat "$tmp/output"
+      printf 'FAIL: %s configuration requires pkgrel=%s, produced %s\n' \
+        "$target" "$expected_release" "$version" >&2
+      exit 1
+    fi
+
+    cp "$target_root/declared.PKGBUILD" "$tmp/fixture/PKGBUILD"
+    sed -i 's/^pkgver=.*/pkgver=0.1.0/' "$tmp/fixture/PKGBUILD"
+    PUBLISHED_VERSION=$version
+    if check_needs_build fixture; then
+      printf 'FAIL: unchanged %s package was rebuilt under a different target context\n' "$target" >&2
+      exit 1
+    fi
+  )
+done
+echo "PASS: selected x86_64 and aarch64 configurations retain their releases and skip unchanged builds"
