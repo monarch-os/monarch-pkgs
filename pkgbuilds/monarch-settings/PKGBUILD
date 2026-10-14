@@ -1,6 +1,6 @@
 pkgname=monarch-settings
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Monarch system and user defaults"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
@@ -176,4 +176,6 @@ package() {
     find "$theme_dir" -type d -exec chmod 0755 {} +
     find "$theme_dir" -type f -exec chmod 0644 {} +
   done
+
+  find "$pkgdir" \( -type d -o -type f \) -perm /0022 -exec chmod go-w {} +
 }
