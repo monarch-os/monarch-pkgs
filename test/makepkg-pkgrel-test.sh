@@ -167,9 +167,15 @@ fixture_pkgrel() {
   esac
 }
 TARGET
-    sed 's/^pkgrel=.*/pkgrel=$(fixture_pkgrel)/' "$tmp/template" >>PKGBUILD
+    sed -e 's/^pkgrel=.*/pkgrel=$(fixture_pkgrel)/' \
+      -e "/^pkgver() {/i if [[ \${CARCH:-} == $target ]]; then" \
+      -e '/^package() {/i fi' "$tmp/template" >>PKGBUILD
     cp PKGBUILD "$target_root/declared.PKGBUILD"
-    if ! build_with_makepkg --config "$MAKEPKG_CONF" --nodeps --nosign --noconfirm --force --clean \
+    selected_config=$MAKEPKG_CONF
+    cp "$MAKEPKG_CONF" "$target_root/default.conf"
+    printf '\nCARCH=unsupported\n' >>"$target_root/default.conf"
+    export MAKEPKG_CONF="$target_root/default.conf"
+    if ! build_with_makepkg --config "$selected_config" --nodeps --nosign --noconfirm --force --clean \
       >"$tmp/output" 2>&1; then
       cat "$tmp/output"
       exit 1
@@ -185,6 +191,7 @@ TARGET
       exit 1
     fi
 
+    export MAKEPKG_CONF="$selected_config"
     cp "$target_root/declared.PKGBUILD" "$tmp/fixture/PKGBUILD"
     sed -i 's/^pkgver=.*/pkgver=0.1.0/' "$tmp/fixture/PKGBUILD"
     PUBLISHED_VERSION=$version
