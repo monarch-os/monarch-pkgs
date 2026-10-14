@@ -34,6 +34,12 @@ else
   echo "==> WARNING: package-metadata.sh not found; VCS rebuild-skip disabled"
 fi
 
+if [[ -z $HELPERS_DIR || ! -f $HELPERS_DIR/makepkg-build.sh ]]; then
+  echo "==> ERROR: makepkg-build.sh not found; refusing to build with inconsistent pkgrel"
+  exit 1
+fi
+source "$HELPERS_DIR/makepkg-build.sh"
+
 # Configure Monarch repositories for dependency resolution
 echo "==> Configuring Monarch repositories for dependency resolution..."
 
@@ -155,7 +161,7 @@ build_package() {
   cd "/src/$pkg" || return 1
 
   # Get PKGBUILD version (including epoch if present)
-  local pkgbuild_version=$(bash -c 'source PKGBUILD; if [[ -n "$epoch" ]]; then echo "${epoch}:${pkgver}-${pkgrel}"; else echo "${pkgver}-${pkgrel}"; fi' 2>/dev/null)
+  local pkgbuild_version=$(pkgbuild_declared_version PKGBUILD)
   
   if [[ -z "$pkgbuild_version" ]]; then
     echo "    ❌ Failed to read PKGBUILD version"
@@ -196,7 +202,7 @@ build_package() {
   # replacement prompts are auto-accepted instead of aborting the build.
   MAKEPKG_FLAGS="-scf --noconfirm"
 
-  if PACMAN=/usr/local/bin/pacman-for-makepkg makepkg $MAKEPKG_FLAGS; then
+  if PACMAN=/usr/local/bin/pacman-for-makepkg build_with_makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
     done
@@ -279,13 +285,17 @@ check_vcs_unchanged() {
   local pkgdir="/pkgbuilds/$pkg"
   local pkgbuild="$pkgdir/PKGBUILD"
 
-  grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild" || return 1
+  pkgbuild_has_pkgver "$pkgbuild" || return 1
 
   local local_version=$(get_local_version "$pkg")
   [[ -z "$local_version" ]] && return 1
 
-  local pkgbuild_epoch=$(cd "$pkgdir" && bash -c 'source PKGBUILD 2>/dev/null; echo "${epoch:-}"')
-  local pkgbuild_pkgrel=$(cd "$pkgdir" && bash -c 'source PKGBUILD 2>/dev/null; echo "${pkgrel}"')
+  local declared_version pkgbuild_epoch="" pkgbuild_pkgrel
+  declared_version=$(pkgbuild_declared_version "$pkgbuild") || return 1
+  pkgbuild_pkgrel="${declared_version##*-}"
+  if [[ ${declared_version%-*} == *:* ]]; then
+    pkgbuild_epoch="${declared_version%%:*}"
+  fi
 
   local prod_pkgrel="${local_version##*-}"
   local prod_no_pkgrel="${local_version%-*}"
@@ -321,14 +331,14 @@ check_needs_build() {
   [[ ! -f "$pkgbuild" ]] && return 1
 
   # Get PKGBUILD version (including epoch if present)
-  local pkgbuild_version=$(cd "/pkgbuilds/$pkg" && bash -c 'source PKGBUILD; if [[ -n "$epoch" ]]; then echo "${epoch}:${pkgver}-${pkgrel}"; else echo "${pkgver}-${pkgrel}"; fi' 2>/dev/null)
+  local pkgbuild_version=$(pkgbuild_declared_version "$pkgbuild")
   [[ -z "$pkgbuild_version" ]] && return 1
 
   # Check if already built
   local local_version=$(get_local_version "$pkg")
 
   # VCS-aware path (only when the metadata helper is available).
-  if [[ "$METADATA_HELPERS" == true ]] && grep -qE '^pkgver[[:space:]]*\(\)' "$pkgbuild"; then
+  if [[ "$METADATA_HELPERS" == true ]] && pkgbuild_has_pkgver "$pkgbuild"; then
     if [[ -n "$local_version" ]] && {
       [[ -n "$(package_extract_vcs_hash_from_version "$local_version")" ]] ||
         { [[ $pkg == "monarch" ]] && package_calver_tag_from_version "$local_version" >/dev/null; }

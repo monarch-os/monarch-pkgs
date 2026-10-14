@@ -50,23 +50,43 @@ if [[ ! -d "$BUILD_OUTPUT_DIR" ]]; then
   exit 1
 fi
 
-# Count packages in build output
-cd "$BUILD_OUTPUT_DIR"
-PACKAGE_COUNT=$(ls -1 *.pkg.tar.* 2>/dev/null | grep -v '\.sig$' | grep -v 'monarch-build\.db' | wc -l)
+if [[ $DRY_RUN != true ]]; then
+  exec {promote_lock}<"$BUILD_OUTPUT_DIR"
+  if ! flock -n "$promote_lock"; then
+    print_error "Another promotion is already using this build directory."
+    exit 1
+  fi
+fi
 
-if [[ $PACKAGE_COUNT -eq 0 ]]; then
+cd "$BUILD_OUTPUT_DIR"
+shopt -s nullglob
+PACKAGE_FILES=()
+SIGNATURE_ONLY=()
+for pkg_file in *.pkg.tar.*; do
+  [[ $pkg_file == monarch-build.db* || $pkg_file == monarch-build.files* ]] && continue
+  if [[ $pkg_file == *.sig ]]; then
+    if [[ ! -e ${pkg_file%.sig} && ! -L ${pkg_file%.sig} ]]; then
+      SIGNATURE_ONLY+=("$pkg_file")
+    fi
+  else
+    PACKAGE_FILES+=("$pkg_file")
+  fi
+done
+
+if (( ${#PACKAGE_FILES[@]} == 0 && ${#SIGNATURE_ONLY[@]} == 0 )); then
   print_warning "No packages found in build output"
   exit 0
 fi
 
-print_info "Found $PACKAGE_COUNT package(s) to promote"
+print_info "Found ${#PACKAGE_FILES[@]} package(s) and ${#SIGNATURE_ONLY[@]} signature-only file(s) to process"
 
 if [[ "$DRY_RUN" == true ]]; then
   print_warning "DRY RUN MODE - No files will be copied"
   echo ""
   print_info "Packages that would be promoted:"
-  ls -1 *.pkg.tar.* 2>/dev/null | grep -v 'monarch-build\.db' | while read -r pkg; do
-    echo "  - $pkg"
+  for pkg_file in *.pkg.tar.*; do
+    [[ $pkg_file == monarch-build.db* || $pkg_file == monarch-build.files* ]] && continue
+    echo "  - $pkg_file"
   done
 else
   echo ""
@@ -74,12 +94,11 @@ else
 
   echo "==> Verifying all packages have signatures..."
   MISSING_SIGS=()
-  for pkg_file in *.pkg.tar.*; do
-    # Skip build database files and signatures themselves
-    [[ "$pkg_file" == monarch-build.db* ]] && continue
-    [[ "$pkg_file" == monarch-build.files* ]] && continue
-    [[ "$pkg_file" == *.sig ]] && continue
-    [[ ! -f "$pkg_file" ]] && continue
+  for pkg_file in "${PACKAGE_FILES[@]}"; do
+    if [[ ! -f $pkg_file || -L $pkg_file || -L $pkg_file.sig ]]; then
+      print_error "Refusing an unsafe package or signature: $pkg_file"
+      exit 1
+    fi
 
     if [[ ! -f "$pkg_file.sig" ]]; then
       MISSING_SIGS+=("$pkg_file")
@@ -102,38 +121,96 @@ else
 
   echo "==> Checking for existing files in production..."
   CONFLICTS=()
-  for pkg_file in *.pkg.tar.*; do
-    [[ "$pkg_file" == monarch-build.db* ]] && continue
-    [[ "$pkg_file" == monarch-build.files* ]] && continue
-    [[ ! -f "$pkg_file" ]] && continue
-
-    if [[ -f "$REPO_DIR/$pkg_file" ]]; then
-      CONFLICTS+=("$pkg_file")
+  ALREADY_PUBLISHED=()
+  TO_PROMOTE=()
+  STAGED_CLEANUP=()
+  verify_recovery_signature() (
+    set -o pipefail
+    local verification_home
+    if [[ -n ${GPG_PRIVATE_KEY:-} ]]; then
+      verification_home=$(mktemp -d) || return 1
+      trap 'gpgconf --homedir "$verification_home" --kill gpg-agent >/dev/null 2>&1 || true; rm -rf -- "$verification_home"' EXIT
+      if ! printf '%s\n' "$GPG_PRIVATE_KEY" |
+        gpg --no-options --homedir "$verification_home" --batch --import; then
+        return 1
+      fi
+      gpg --no-options --homedir "$verification_home" --batch --no-auto-key-retrieve \
+        --verify "$1" "$2"
+    else
+      gpg --batch --no-auto-key-retrieve --verify "$1" "$2"
     fi
+  )
+
+  plan_signature_recovery() {
+    local package="$1"
+    if [[ ! -f $package.sig || -L $package.sig || ! -f $REPO_DIR/$package || -L $REPO_DIR/$package ]]; then
+      CONFLICTS+=("$package.sig (staged signature or published archive is missing or unsafe)")
+      return 1
+    fi
+    if [[ -e $REPO_DIR/$package.sig || -L $REPO_DIR/$package.sig ]] &&
+      [[ ! -f $REPO_DIR/$package.sig || -L $REPO_DIR/$package.sig ]]; then
+      CONFLICTS+=("$package.sig (unsafe published signature)")
+      return 1
+    fi
+    # Without a staged archive, the signature must prove which published bytes it covers.
+    if ! verify_recovery_signature "$package.sig" "$REPO_DIR/$package" >/dev/null 2>&1; then
+      CONFLICTS+=("$package.sig (cannot verify against the published archive; check signature and signing key)")
+      return 1
+    fi
+    if [[ -f $REPO_DIR/$package.sig ]]; then
+      ALREADY_PUBLISHED+=("$package")
+      STAGED_CLEANUP+=("$package.sig")
+    else
+      TO_PROMOTE+=("$package.sig")
+    fi
+  }
+
+  for pkg_file in "${PACKAGE_FILES[@]}"; do
+
+    if [[ -e $REPO_DIR/$pkg_file || -L $REPO_DIR/$pkg_file ]]; then
+      if [[ -f $REPO_DIR/$pkg_file && ! -L $REPO_DIR/$pkg_file ]] &&
+        cmp -s -- "$pkg_file" "$REPO_DIR/$pkg_file"; then
+        if [[ -f $REPO_DIR/$pkg_file.sig && ! -L $REPO_DIR/$pkg_file.sig ]]; then
+          ALREADY_PUBLISHED+=("$pkg_file")
+          STAGED_CLEANUP+=("$pkg_file" "$pkg_file.sig")
+        else
+          if plan_signature_recovery "$pkg_file"; then
+            STAGED_CLEANUP+=("$pkg_file")
+          fi
+        fi
+      else
+        CONFLICTS+=("$pkg_file (different contents or unsafe destination)")
+      fi
+    elif [[ -e $REPO_DIR/$pkg_file.sig || -L $REPO_DIR/$pkg_file.sig ]]; then
+      CONFLICTS+=("$pkg_file.sig (signature exists without its package)")
+    else
+      TO_PROMOTE+=("$pkg_file" "$pkg_file.sig")
+    fi
+  done
+
+  for signature in "${SIGNATURE_ONLY[@]}"; do
+    plan_signature_recovery "${signature%.sig}" || true
   done
 
   if [[ ${#CONFLICTS[@]} -gt 0 ]]; then
     echo ""
-    print_error "ERROR: The following packages already exist in production:"
+    print_error "ERROR: The following packages conflict with production:"
     for conflict in "${CONFLICTS[@]}"; do
       echo "  - $conflict"
     done
     echo ""
-    print_error "Packages already exist in pkgs.monarchlinux.com!"
+    print_error "Refusing to overwrite or publish unverifiable files. Bump pkgrel for changed package contents."
     exit 1
   fi
 
-  # Move all package files (excluding build database)
-  # Using mv instead of cp avoids filesystem sync issues and is atomic
+  for pkg_file in "${ALREADY_PUBLISHED[@]}"; do
+    print_info "Already published with identical contents: $pkg_file"
+  done
+
   print_info "Moving packages to production..."
   MOVED=0
-  for pkg_file in *.pkg.tar.*; do
-    # Skip build database files
-    [[ "$pkg_file" == monarch-build.db* ]] && continue
-    [[ "$pkg_file" == monarch-build.files* ]] && continue
-    [[ ! -f "$pkg_file" ]] && continue
-
-    if mv -v "$pkg_file" "$REPO_DIR/"; then
+  for pkg_file in "${TO_PROMOTE[@]}"; do
+    if mv -v -T --no-clobber -- "$pkg_file" "$REPO_DIR/$pkg_file" && [[ ! -e $pkg_file ]]; then
       MOVED=$((MOVED + 1))
     else
       print_error "Failed to move $pkg_file"
@@ -146,7 +223,10 @@ else
   
   # Cleanup build directory after successful promotion
   print_info "Cleaning up build directory..."
-  cd "$BUILD_OUTPUT_DIR"
-  rm -f *.pkg.tar.* monarch-build.db* monarch-build.files*
+  # Preserve the staged proof until every planned move succeeds, so failures remain retryable.
+  if (( ${#STAGED_CLEANUP[@]} > 0 )); then
+    rm -- "${STAGED_CLEANUP[@]}"
+  fi
+  rm -f -- monarch-build.db* monarch-build.files*
   print_success "Build directory cleaned"
 fi
