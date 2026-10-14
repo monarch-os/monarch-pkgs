@@ -202,3 +202,17 @@ TARGET
   )
 done
 echo "PASS: selected x86_64 and aarch64 configurations retain their releases and skip unchanged builds"
+
+mkdir "$tmp/failed-source"
+cd "$tmp/failed-source"
+cp "$tmp/template" PKGBUILD
+printf '\n[[ $CARCH == unsupported ]] && depends+=(foo)\n' >>PKGBUILD
+previous_prepares=$(wc -l <"$PREPARE_RECORD")
+status=0
+build_with_makepkg "${flags[@]}" >"$tmp/output" 2>&1 || status=$?
+if (( status != 6 || $(wc -l <"$PREPARE_RECORD") != previous_prepares )); then
+  cat "$tmp/output"
+  echo "FAIL: makepkg must reject a failing final PKGBUILD command before preparing sources" >&2
+  exit 1
+fi
+echo "PASS: a failing final PKGBUILD command is rejected by makepkg before any build"
