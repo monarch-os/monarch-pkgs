@@ -5,6 +5,10 @@ runtime, editor assets, fonts, dictionaries and third-party licence notices.
 No FUSE dependency or document server is required. The Chromium sandbox stays
 enabled; do not work around launch failures with `--no-sandbox`.
 
+The packaging is maintained on the AUR:
+<https://aur.archlinux.org/packages/elixiroffice-bin>.
+Monarch syncs that recipe through the normal AUR package workflow.
+
 Build from the repository root:
 
 ```bash
@@ -19,7 +23,9 @@ Linux aarch64 binaries are not currently supplied upstream.
 
 For updates, select a **desktop** release (server releases have separate versions),
 update `pkgver` and the Debian asset's SHA-256 from that release's `SHA256SUMS`,
-and reset `pkgrel` to 1. Verify the downloaded checksum before building.
+and reset `pkgrel` to 1. Verify the downloaded checksum before building. Publish
+the updated PKGBUILD and regenerated `.SRCINFO` to the AUR, then sync it here with
+`bin/sync-aur elixiroffice-bin`.
 
 The corresponding AGPL source is published alongside each desktop release as
 `elixiroffice-desktop-source.tar.gz`:

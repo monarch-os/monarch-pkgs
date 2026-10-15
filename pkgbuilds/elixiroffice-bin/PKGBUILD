@@ -1,3 +1,5 @@
+# Maintainer: y0no <2242427+y0no@users.noreply.github.com>
+
 pkgname=elixiroffice-bin
 pkgver=0.2.0
 pkgrel=2
