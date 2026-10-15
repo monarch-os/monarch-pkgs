@@ -215,7 +215,7 @@ The build system automatically handles inter-package dependencies:
 2. Builds in correct order
 3. Makes newly-built packages available via temporary `[omarchy-build]` repo
 
-Example: If `aether` depends on `hyprshade`, `hyprshade` is built first.
+Dependencies provided by another package in this repository are built before their dependents.
 
 ## Version Management
 
