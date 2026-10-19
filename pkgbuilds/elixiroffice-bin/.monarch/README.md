@@ -29,4 +29,4 @@ the updated PKGBUILD and regenerated `.SRCINFO` to the AUR, then sync it here wi
 
 The corresponding AGPL source is published alongside each desktop release as
 `elixiroffice-desktop-source.tar.gz`:
-<https://github.com/leag1234/elixiroffice/releases/tag/v0.2.1>.
+<https://github.com/leag1234/elixiroffice/releases/tag/v0.2.3>.
