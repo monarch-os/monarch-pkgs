@@ -8,6 +8,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/src/monarch"
+cp "$root/build-noctalia-templates.py" "$work/src/"
 cp -a "$source_tree"/{config,default,applications,etc,LICENSE,logo.txt,icon.txt} \
   "$work/src/monarch/"
 for mode in 0600 0660 0646 0757; do

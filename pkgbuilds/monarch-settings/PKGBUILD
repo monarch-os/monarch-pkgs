@@ -1,6 +1,6 @@
 pkgname=monarch-settings
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Monarch system and user defaults"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
@@ -155,8 +155,9 @@ package() {
   cp -a default/noctalia/plugins/. "$pkgdir/etc/skel/.local/share/noctalia/plugins/"
   install -d "$pkgdir/etc/skel/.local/state/noctalia"
   touch "$pkgdir/etc/skel/.local/state/noctalia/.setup-complete"
-  MONARCH_PATH="$pkgdir/usr/share/monarch" python3 install/reconcile/noctalia-templates.py \
-    --state-home "$pkgdir/etc/skel/.local/state"
+  install -d "$pkgdir/etc/skel/.local/state/noctalia/community-templates"
+  cp -a "$pkgdir/usr/share/monarch/default/noctalia/community-templates/"{neovim,obsidian,zed,vscode,catalog.json} \
+    "$pkgdir/etc/skel/.local/state/noctalia/community-templates/"
 
   install -d "$pkgdir/usr/share/sddm/themes" "$pkgdir/usr/share/sddm"
   cp -a default/sddm/monarch "$pkgdir/usr/share/sddm/themes/"
