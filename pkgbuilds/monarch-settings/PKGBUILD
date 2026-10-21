@@ -1,11 +1,11 @@
 pkgname=monarch-settings
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Monarch system and user defaults"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
-license=('MIT')
-depends=('bash' 'curl' 'gum' 'hicolor-icon-theme' 'plymouth')
+license=('MIT' 'LicenseRef-unknown')
+depends=('bash' 'curl' 'gum' 'hicolor-icon-theme' 'plymouth' 'python')
 makedepends=('git')
 install='monarch-settings.install'
 backup=(
@@ -33,12 +33,11 @@ backup=(
   'etc/sddm.conf.d/10-theme.conf'
   'etc/sddm.conf.d/10-wayland.conf'
 )
-if [[ -n ${MONARCH_SRC:-} ]]; then
-  source=()
-  sha256sums=()
-else
-  source=("monarch::git+https://github.com/monarch-os/monarch.git#branch=dev")
-  sha256sums=('SKIP')
+source=('build-noctalia-templates.py')
+sha256sums=('ea77d7c7f97cbb543459a2a73047dc879c388c18efc4e816c63f5d28c2ac0412')
+if [[ -z ${MONARCH_SRC:-} ]]; then
+  source+=("monarch::git+https://github.com/monarch-os/monarch.git#branch=dev")
+  sha256sums+=('SKIP')
 fi
 
 pkgver() {
@@ -74,6 +73,8 @@ package() {
 
   install -d "$pkgdir/usr/share/monarch/default" "$pkgdir/usr/share/monarch/applications"
   cp -a default/. "$pkgdir/usr/share/monarch/default/"
+  python3 "$srcdir/build-noctalia-templates.py" \
+    "$pkgdir/usr/share/monarch/default/noctalia/community-templates"
   cp -a applications/. "$pkgdir/usr/share/monarch/applications/"
 
   install -d "$pkgdir/etc"
@@ -154,6 +155,9 @@ package() {
   cp -a default/noctalia/plugins/. "$pkgdir/etc/skel/.local/share/noctalia/plugins/"
   install -d "$pkgdir/etc/skel/.local/state/noctalia"
   touch "$pkgdir/etc/skel/.local/state/noctalia/.setup-complete"
+  install -d "$pkgdir/etc/skel/.local/state/noctalia/community-templates"
+  cp -a "$pkgdir/usr/share/monarch/default/noctalia/community-templates/"{neovim,obsidian,zed,vscode,catalog.json} \
+    "$pkgdir/etc/skel/.local/state/noctalia/community-templates/"
 
   install -d "$pkgdir/usr/share/sddm/themes" "$pkgdir/usr/share/sddm"
   cp -a default/sddm/monarch "$pkgdir/usr/share/sddm/themes/"
