@@ -35,6 +35,8 @@ home = root / 'etc/skel'
 assert not (home / '.local/state/noctalia/settings.toml').exists()
 cache = home / '.local/state/noctalia/community-templates'
 bundle = root / 'usr/share/monarch/default/noctalia/community-templates'
+sources = Path(os.environ['MONARCH_SOURCE_PATH']) / 'default/noctalia/community-templates'
+assert (bundle / 'upstream.json').read_bytes() == (sources / 'upstream.json').read_bytes()
 catalog = json.loads((cache / 'catalog.json').read_text())['templates']
 assert {entry['name'] for entry in catalog} == {'neovim', 'obsidian', 'zed', 'vscode'}
 assert (cache / 'catalog.json').read_bytes() == (bundle / 'catalog.json').read_bytes()
@@ -55,6 +57,7 @@ for entry in catalog:
     assert hashlib.md5(path.read_bytes(), usedforsecurity=False).hexdigest() == metadata['files'][filename] == file['md5']
     assert f'{path.stat().st_mode & 0o777:04o}' == file['mode']
     assert path.read_bytes() == (bundle / name / filename).read_bytes()
+    assert path.read_bytes() == (sources / name / filename).read_bytes()
   assert (cache / name / '.noctalia-cache.json').read_bytes() == (bundle / name / '.noctalia-cache.json').read_bytes()
 PY
   echo "monarch-settings provides tracked templates before first login"
