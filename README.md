@@ -219,6 +219,19 @@ Dependencies provided by another package in this repository are built before the
 
 ## Version Management
 
+### Local validation
+
+Run all deterministic repository tests with:
+
+```bash
+for test in test/*-test.sh; do bash "$test" || exit; done
+```
+
+`test/todo-package-test.sh` covers both the currently published legacy Todo tag
+and the native desktop payload's Makefile handoff. It needs Bash, make and
+coreutils, and runs only against temporary fixtures. Advance Todo's source tag
+to 0.2.0 only after that backend release exists.
+
 Packages are only rebuilt if:
 - PKGBUILD version is newer than repository version
 - Package doesn't exist in production

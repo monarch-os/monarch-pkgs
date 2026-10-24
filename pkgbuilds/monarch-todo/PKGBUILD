@@ -3,16 +3,20 @@
 pkgname=monarch-todo
 pkgver=0.1.2
 pkgrel=1
-pkgdesc="Fast TUI/CLI todo manager for Monarch"
+pkgdesc="Task manager and reminders for Monarch"
 arch=('x86_64')
 url="https://github.com/monarch-os/monarch-todo"
 license=('MIT')
+depends=('glibc' 'gcc-libs' 'systemd' 'libnotify' 'bash')
 makedepends=(
     'cargo'
     'git'
+    'make'
 )
 optdepends=(
-    'monarch: reminders, the Mod+T launcher and the Noctalia bar widget'
+    'monarch: Mod+T shortcut and bar integration'
+    'noctalia>=5.3.0: native task panel'
+    'python: desktop plugin activation'
 )
 source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-todo.git#tag=v$pkgver")
 sha256sums=('SKIP')
@@ -34,7 +38,12 @@ build() {
 package() {
     cd "$srcdir/$pkgname-$pkgver"
 
-    # Single binary: bare = TUI, subcommands = CLI.
+    # New releases own the backend and desktop payload in one transaction.
+    # Keep the published 0.1.2 tag buildable until v0.2.0 is actually released.
+    if [[ -f Makefile && -f noctalia/monarch-todo/plugin.toml ]]; then
+        make DESTDIR="$pkgdir" PREFIX=/usr install
+        return
+    fi
     install -Dm755 "target/release/monarch-todo" "$pkgdir/usr/bin/monarch-todo"
 
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
