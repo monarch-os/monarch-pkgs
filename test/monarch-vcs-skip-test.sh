@@ -14,11 +14,11 @@ git -C "$tmp/upstream" config user.email test@example.invalid
 git -C "$tmp/upstream" commit --quiet --allow-empty -m Initial
 git -C "$tmp/upstream" tag v2026.10.0
 sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
-  "$ROOT/pkgbuilds/monarch/PKGBUILD" >"$PKGBUILDS_DIR/monarch/PKGBUILD"
+  "$ROOT/pkgbuilds/monarch/PKGBUILD" | sed 's/^pkgrel=.*/pkgrel=2/' >"$PKGBUILDS_DIR/monarch/PKGBUILD"
 mkdir -p "$PKGBUILDS_DIR/monarch-settings"
 cp "$ROOT/pkgbuilds/monarch-settings/monarch-settings.install" "$PKGBUILDS_DIR/monarch-settings/"
 sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
-  "$ROOT/pkgbuilds/monarch-settings/PKGBUILD" >"$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
+  "$ROOT/pkgbuilds/monarch-settings/PKGBUILD" | sed 's/^pkgrel=.*/pkgrel=2/' >"$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
 
 source "$ROOT/helpers/package-metadata.sh"
 source "$ROOT/helpers/makepkg-build.sh"

@@ -1,4 +1,11 @@
 post_install() {
+    if [[ -f /usr/share/monarch-todo/desktop/integration.sh ]]; then
+        echo "monarch-todo: native panel and backend installed together."
+        echo "As your desktop user: monarch-todo panel"
+        echo "On Monarch: monarch install todo also configures Super+T."
+        echo "Before removing: monarch-todo remove-desktop (or monarch remove todo)."
+        return
+    fi
     echo "==========================================="
     echo "  monarch-todo installed successfully!"
     echo "==========================================="
