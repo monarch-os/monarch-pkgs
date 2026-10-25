@@ -227,10 +227,9 @@ Run all deterministic repository tests with:
 for test in test/*-test.sh; do bash "$test" || exit; done
 ```
 
-`test/todo-package-test.sh` covers both the currently published legacy Todo tag
-and the native desktop payload's Makefile handoff. It needs Bash, make and
-coreutils, and runs only against temporary fixtures. Advance Todo's source tag
-to 0.2.0 only after that backend release exists.
+`test/todo-package-test.sh` checks the published Todo 0.2.0 tag, the native desktop
+payload's Makefile handoff, and rejection of an incomplete legacy source tree.
+It needs Bash, make and coreutils, and runs only against temporary fixtures.
 
 Packages are only rebuilt if:
 - PKGBUILD version is newer than repository version

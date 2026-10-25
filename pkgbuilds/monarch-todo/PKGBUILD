@@ -1,7 +1,7 @@
 # Maintainer: Yoann ONO <contact@y0no.fr>
 
 pkgname=monarch-todo
-pkgver=0.1.2
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Task manager and reminders for Monarch"
 arch=('x86_64')
@@ -38,14 +38,6 @@ build() {
 package() {
     cd "$srcdir/$pkgname-$pkgver"
 
-    # New releases own the backend and desktop payload in one transaction.
-    # Keep the published 0.1.2 tag buildable until v0.2.0 is actually released.
-    if [[ -f Makefile && -f noctalia/monarch-todo/plugin.toml ]]; then
-        make DESTDIR="$pkgdir" PREFIX=/usr install
-        return
-    fi
-    install -Dm755 "target/release/monarch-todo" "$pkgdir/usr/bin/monarch-todo"
-
-    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    # Backend, plugin, desktop entry and reminder unit must ship together.
+    make DESTDIR="$pkgdir" PREFIX=/usr install
 }
