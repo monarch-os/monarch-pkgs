@@ -1,7 +1,7 @@
 pkgbase = monarch-lazyvpn
 	pkgdesc = Native graphical WireGuard multi-provider VPN manager
 	pkgver = 0.2.0
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/monarch-os/monarch-lazyvpn
 	install = monarch-lazyvpn.install
 	arch = x86_64
@@ -27,6 +27,7 @@ pkgbase = monarch-lazyvpn
 	optdepends = vulkan-driver: Vulkan rendering backend
 	optdepends = xdg-desktop-portal-gnome: file picker on Niri
 	optdepends = noctalia: live desktop palette integration
+	options = !lto
 	backup = etc/sudoers.d/monarch-lazyvpn
 	source = monarch-lazyvpn-0.2.0::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v0.2.0
 	sha256sums = SKIP
