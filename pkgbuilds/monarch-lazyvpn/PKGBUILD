@@ -2,11 +2,12 @@
 
 pkgname=monarch-lazyvpn
 pkgver=0.2.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Native graphical WireGuard multi-provider VPN manager"
 arch=('x86_64')
 url="https://github.com/monarch-os/monarch-lazyvpn"
 license=('MIT')
+options=('!lto')
 depends=(
     'wireguard-tools'
     'nftables'
