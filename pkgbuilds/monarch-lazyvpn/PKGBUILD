@@ -1,9 +1,9 @@
 # Maintainer: Yoann ONO <contact@y0no.fr>
 
 pkgname=monarch-lazyvpn
-pkgver=0.1.5
+pkgver=0.2.0
 pkgrel=1
-pkgdesc="TUI WireGuard multi-provider VPN manager"
+pkgdesc="Native graphical WireGuard multi-provider VPN manager"
 arch=('x86_64')
 url="https://github.com/monarch-os/monarch-lazyvpn"
 license=('MIT')
@@ -12,10 +12,25 @@ depends=(
     'nftables'
     'polkit'
     'libsecret'
+    'gcc-libs'
+    'openssl'
+    'wayland'
+    'libxkbcommon'
+    'libxkbcommon-x11'
+    'libxcb'
+    'libglvnd'
+    'fontconfig'
+    'freetype2'
+    'xdg-desktop-portal'
 )
+optdepends=('vulkan-driver: Vulkan rendering backend'
+            'xdg-desktop-portal-gnome: file picker on Niri'
+            'noctalia: live desktop palette integration')
 makedepends=(
     'cargo'
     'git'
+    'clang'
+    'pkgconf'
 )
 source=("$pkgname-$pkgver::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v$pkgver")
 sha256sums=('SKIP')
@@ -40,9 +55,12 @@ build() {
 package() {
     cd "$srcdir/$pkgname-$pkgver"
 
-    # Install binaries
     install -Dm755 "target/release/monarch-lazyvpn" "$pkgdir/usr/bin/monarch-lazyvpn"
     install -Dm755 "target/release/monarch-lazyvpn-status" "$pkgdir/usr/bin/monarch-lazyvpn-status"
+    install -Dm755 "target/release/monarch-lazyvpn-gui" "$pkgdir/usr/bin/monarch-lazyvpn-gui"
+    install -Dm644 "assets/monarch-lazyvpn.desktop" "$pkgdir/usr/share/applications/monarch-lazyvpn.desktop"
+    install -Dm644 "assets/noctalia/lazyvpn.json" "$pkgdir/usr/share/monarch-lazyvpn/noctalia/lazyvpn.json"
+    install -Dm644 "assets/flags/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/flag-icons-LICENSE"
 
     # Install sudoers configuration
     install -dm750 "$pkgdir/etc/sudoers.d"
