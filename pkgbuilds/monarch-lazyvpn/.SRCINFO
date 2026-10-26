@@ -1,6 +1,6 @@
 pkgbase = monarch-lazyvpn
-	pkgdesc = TUI WireGuard multi-provider VPN manager
-	pkgver = 0.1.4
+	pkgdesc = Native graphical WireGuard multi-provider VPN manager
+	pkgver = 0.2.0
 	pkgrel = 1
 	url = https://github.com/monarch-os/monarch-lazyvpn
 	install = monarch-lazyvpn.install
@@ -8,12 +8,27 @@ pkgbase = monarch-lazyvpn
 	license = MIT
 	makedepends = cargo
 	makedepends = git
+	makedepends = clang
+	makedepends = pkgconf
 	depends = wireguard-tools
 	depends = nftables
 	depends = polkit
 	depends = libsecret
+	depends = gcc-libs
+	depends = openssl
+	depends = wayland
+	depends = libxkbcommon
+	depends = libxkbcommon-x11
+	depends = libxcb
+	depends = libglvnd
+	depends = fontconfig
+	depends = freetype2
+	depends = xdg-desktop-portal
+	optdepends = vulkan-driver: Vulkan rendering backend
+	optdepends = xdg-desktop-portal-gnome: file picker on Niri
+	optdepends = noctalia: live desktop palette integration
 	backup = etc/sudoers.d/monarch-lazyvpn
-	source = monarch-lazyvpn-0.1.4::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v0.1.4
+	source = monarch-lazyvpn-0.2.0::git+https://github.com/monarch-os/monarch-lazyvpn.git#tag=v0.2.0
 	sha256sums = SKIP
 
 pkgname = monarch-lazyvpn
