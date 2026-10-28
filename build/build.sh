@@ -307,7 +307,7 @@ check_vcs_unchanged() {
   [[ "$pkgbuild_epoch" != "$prod_epoch" ]] && return 1
   [[ "$pkgbuild_pkgrel" != "$prod_pkgrel" ]] && return 1
 
-  if [[ $pkg == "monarch" || $pkg == "monarch-settings" ]]; then
+  if [[ $pkg == "monarch" ]]; then
     local source_version
     source_version=$(package_monarch_source_version "$pkgdir") || return 1
     [[ ${prod_no_pkgrel#*:} == "$source_version" ]]
@@ -341,7 +341,7 @@ check_needs_build() {
   if [[ "$METADATA_HELPERS" == true ]] && pkgbuild_has_pkgver "$pkgbuild"; then
     if [[ -n "$local_version" ]] && {
       [[ -n "$(package_extract_vcs_hash_from_version "$local_version")" ]] ||
-        { [[ $pkg == "monarch" || $pkg == "monarch-settings" ]] && package_calver_tag_from_version "$local_version" >/dev/null; }
+        { [[ $pkg == "monarch" ]] && package_calver_tag_from_version "$local_version" >/dev/null; }
     }; then
       if check_vcs_unchanged "$pkg"; then
         return 1  # upstream ref already represented in the repo

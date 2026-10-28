@@ -9,7 +9,7 @@ trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/src/monarch"
 cp "$root/build-noctalia-templates.py" "$work/src/"
-cp -a "$source_tree"/{config,default,applications,etc,LICENSE,logo.txt,icon.txt} \
+cp -a "$source_tree"/{assets,bin,install,themes,config,default,applications,etc,LICENSE,README.md,boot.sh,install.sh,logo.txt,logo.svg,icon.txt,icon.png} \
   "$work/src/monarch/"
 for mode in 0600 0660 0646 0757; do
   touch "$work/src/monarch/config/permissions-$mode.conf"
@@ -33,7 +33,7 @@ chmod 0777 "$work/src/monarch/default/sddm/monarch/Main.qml"
 source "$root/PKGBUILD"
 srcdir=$work/src
 pkgdir=$work/pkg
-(umask 0000; package)
+(umask 0000; package_monarch)
 
 invalid=$(find "$pkgdir" \( -type d -o -type f \) -perm /0022 -print -quit)
 if [[ -n $invalid ]]; then
@@ -75,4 +75,4 @@ for policy in "$pkgdir/etc/sudoers.d"/*; do
   [[ $(stat -c %a "$policy") == "440" ]]
 done
 
-echo "monarch-settings packaging removes group/world write while retaining private modes, executables and sudoers"
+echo "monarch defaults retain private modes, executables and sudoers without group/world write"

@@ -8,7 +8,8 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/src/monarch"
-cp -a "$source_tree"/{assets,bin,install,themes,default,LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt} \
+cp "$root/build-noctalia-templates.py" "$work/src/"
+cp -a "$source_tree"/{assets,bin,install,themes,config,default,applications,etc,LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt} \
   "$work/src/monarch/"
 printf '%s\n' fixture >"$work/src/monarch/assets/permissions-test.conf"
 chmod 0777 "$work/src/monarch/assets"
@@ -27,7 +28,7 @@ ln -s "$work/external" "$work/src/monarch/assets/external"
 source "$root/PKGBUILD"
 srcdir=$work/src
 pkgdir=$work/pkg
-(umask 0000; package)
+(umask 0000; package_monarch)
 
 invalid=$(find "$pkgdir" \( -type d -o -type f \) -perm /0022 -print -quit)
 if [[ -n $invalid ]]; then

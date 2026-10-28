@@ -47,6 +47,44 @@ bin/repo sync pkgs.omarchy.org/x86_64   # Sync to remote
 
 ## Commands
 
+### Unified Monarch package
+
+`pkgbuilds/monarch/PKGBUILD` owns the runtime, reference configuration, system
+defaults, user skeleton and installation scriptlet. The ISO extracts its live
+assets from this one archive and installs only `monarch` on a fresh target.
+
+The same recipe also produces an empty `monarch-settings` transition package,
+pinned to the exact `monarch` build. Keep it published while upgrades from the
+two-package layout are supported. It is an upgrade target for existing systems,
+not a dependency of `monarch` or a second independently built component.
+
+Do not replace it with `replaces`/`conflicts`: Pacman removes the old owner's
+edited backup files as `.pacsave` before installing the new owner. Upgrading
+both names in one transaction transfers the files while keeping the user's
+configuration active, with defaults in `.pacnew` where necessary. Monarch's
+package-layout reconciler removes the transition package only when it owns no
+files; it leaves older, nonempty settings packages alone.
+
+Land the compatible reconciler in `monarch/dev` before publishing this recipe.
+The recipe and the one-archive `monarch-iso` builder must then be deployed
+together, or selected together through `MONARCH_PKGS_REF` and the ISO checkout.
+Old ISO images retain their offline package pair and can use the same upgrade
+path. Old builder checkouts still require their matching two-directory recipes.
+
+Validate the actual package transition on an Arch host with user namespaces:
+
+```bash
+bash test/monarch-package-upgrade-test.sh \
+  /path/to/old-monarch.pkg.tar.zst /path/to/old-monarch-settings.pkg.tar.zst \
+  /path/to/new-monarch.pkg.tar.zst /path/to/empty-monarch-settings.pkg.tar.zst
+```
+
+The test uses real Pacman transactions in disposable roots, retaining every
+edited `backup` entry, an untouched config with a stale `.pacsave`, and a user
+overlay. It checks ownership, the empty-package cleanup, reinstallation and a
+fresh single-package install. External dependencies use fixture providers;
+desktop and boot validation still belongs to the ISO VM tests.
+
 ### Build
 
 ```bash
