@@ -63,7 +63,9 @@ edited backup files as `.pacsave` before installing the new owner. Upgrading
 both names in one transaction transfers the files while keeping the user's
 configuration active, with defaults in `.pacnew` where necessary. Monarch's
 package-layout reconciler removes the transition package only when it owns no
-files; it leaves older, nonempty settings packages alone.
+files and the installed `monarch` version matches exactly, including epoch and
+release. A missing or mismatched runtime stops cleanup; older, nonempty settings
+packages remain untouched.
 
 Land the compatible reconciler in `monarch/dev` before publishing this recipe.
 The recipe and the one-archive `monarch-iso` builder must then be deployed

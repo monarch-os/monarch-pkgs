@@ -132,3 +132,21 @@ for path in "${backups[@]}"; do
 done
 cmp "$root/etc/os-release" "$root/usr/share/monarch/etc-overrides/os-release"
 echo 'ok - fresh installation needs only monarch and applies its defaults and scriptlet'
+
+root=$work/mismatch
+create_root
+# Deliberately bypass dependency checks to model an incomplete installation.
+pm -Udd --noconfirm "$bridge"
+bsdtar -xOf "$unified" usr/share/monarch/install/reconcile/package-layout.sh >"$root/tmp/package-layout.sh"
+if chroot "$root" /bin/bash /tmp/package-layout.sh; then
+  echo 'Cleanup accepted a missing Monarch runtime' >&2
+  exit 1
+fi
+pm -Q monarch-settings
+pm -Udd --noconfirm "$old_runtime"
+if chroot "$root" /bin/bash /tmp/package-layout.sh; then
+  echo 'Cleanup accepted a mismatched Monarch runtime' >&2
+  exit 1
+fi
+pm -Q monarch-settings
+echo 'ok - missing and mismatched runtimes retain the bridge and fail cleanup'
