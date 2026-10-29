@@ -5,12 +5,12 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 if rg -n 'cups-browsed|cups-cups-browsed' \
-  "$root/PKGBUILD" "$root/monarch-settings.install"; then
-  echo "monarch-settings still owns cups-browsed configuration" >&2
+  "$root/PKGBUILD" "$root/monarch.install"; then
+  echo "monarch still owns cups-browsed configuration" >&2
   exit 1
 fi
 
-echo "monarch-settings leaves cups-browsed configuration unowned"
+echo "monarch leaves cups-browsed configuration unowned"
 
 if [[ -n ${MONARCH_SOURCE_PATH:-} ]]; then
   temporary=$(mktemp -d)
@@ -22,7 +22,11 @@ if [[ -n ${MONARCH_SOURCE_PATH:-} ]]; then
   mkdir -p "$srcdir" "$pkgdir"
   ln -s "$MONARCH_SOURCE_PATH" "$srcdir/monarch"
   cp "$root/build-noctalia-templates.py" "$srcdir/"
-  package
+  pkgver=$(pkgver)
+  package_monarch
+  [[ $(<"$pkgdir/usr/share/monarch/version") == "$pkgver" ]]
+  [[ $(<"$pkgdir/usr/share/monarch/revision") == "$(git -C "$MONARCH_SOURCE_PATH" rev-parse HEAD)" ]]
+  [[ -L $pkgdir/usr/bin/monarch ]]
   SETTINGS_TEST_ROOT="$pkgdir" python3 <<'PY'
 import hashlib
 import json
@@ -60,5 +64,5 @@ for entry in catalog:
     assert path.read_bytes() == (sources / name / filename).read_bytes()
   assert (cache / name / '.noctalia-cache.json').read_bytes() == (bundle / name / '.noctalia-cache.json').read_bytes()
 PY
-  echo "monarch-settings provides tracked templates before first login"
+  echo "monarch provides tracked templates before first login"
 fi

@@ -15,10 +15,7 @@ git -C "$tmp/upstream" commit --quiet --allow-empty -m Initial
 git -C "$tmp/upstream" tag v2026.10.0
 sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
   "$ROOT/pkgbuilds/monarch/PKGBUILD" | sed 's/^pkgrel=.*/pkgrel=2/' >"$PKGBUILDS_DIR/monarch/PKGBUILD"
-mkdir -p "$PKGBUILDS_DIR/monarch-settings"
-cp "$ROOT/pkgbuilds/monarch-settings/monarch-settings.install" "$PKGBUILDS_DIR/monarch-settings/"
-sed "s|https://github.com/monarch-os/monarch.git|file://$tmp/upstream|" \
-  "$ROOT/pkgbuilds/monarch-settings/PKGBUILD" | sed 's/^pkgrel=.*/pkgrel=2/' >"$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
+cp "$ROOT/pkgbuilds/monarch/monarch.install" "$PKGBUILDS_DIR/monarch/"
 
 source "$ROOT/helpers/package-metadata.sh"
 source "$ROOT/helpers/makepkg-build.sh"
@@ -30,23 +27,17 @@ for function in check_vcs_unchanged check_needs_build; do
 done
 
 expect_skip() {
-  local package
-  for package in monarch monarch-settings; do
-    if check_needs_build "$package"; then
-      echo "Unchanged $package was scheduled for rebuilding: $PUBLISHED_VERSION" >&2
-      exit 1
-    fi
-  done
+  if check_needs_build monarch; then
+    echo "Unchanged monarch was scheduled for rebuilding: $PUBLISHED_VERSION" >&2
+    exit 1
+  fi
 }
 
 expect_build() {
-  local package
-  for package in monarch monarch-settings; do
-    if ! check_needs_build "$package"; then
-      echo "Changed or unverifiable $package was skipped: $PUBLISHED_VERSION" >&2
-      exit 1
-    fi
-  done
+  if ! check_needs_build monarch; then
+    echo "Changed or unverifiable monarch was skipped: $PUBLISHED_VERSION" >&2
+    exit 1
+  fi
 }
 
 PUBLISHED_VERSION=2026.10.0-2
@@ -63,10 +54,8 @@ expect_build
 PUBLISHED_VERSION=1:2026.11.0-2
 expect_build
 printf '\nepoch=1\n' >>"$PKGBUILDS_DIR/monarch/PKGBUILD"
-printf '\nepoch=1\n' >>"$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
 expect_skip
 sed -i '/^epoch=1$/d' "$PKGBUILDS_DIR/monarch/PKGBUILD"
-sed -i '/^epoch=1$/d' "$PKGBUILDS_DIR/monarch-settings/PKGBUILD"
 echo "Package release and epoch changes still trigger rebuilding"
 
 git -C "$tmp/upstream" commit --quiet --allow-empty -m Update
@@ -123,6 +112,7 @@ echo "An unreachable source fails open to rebuilding rather than skipping"
 
 mkdir -p "$PKGBUILDS_DIR/other"
 cp "$PKGBUILDS_DIR/monarch/PKGBUILD" "$PKGBUILDS_DIR/other/PKGBUILD"
+cp "$PKGBUILDS_DIR/monarch/monarch.install" "$PKGBUILDS_DIR/other/"
 if ! check_needs_build other; then
   echo "Monarch-specific CalVer detection changed another VCS package" >&2
   exit 1
