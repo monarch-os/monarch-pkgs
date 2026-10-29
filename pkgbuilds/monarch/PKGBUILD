@@ -54,6 +54,8 @@ backup=(
   'etc/systemd/system.conf.d/20-monarch-nofile.conf'
   'etc/systemd/user.conf.d/20-monarch-nofile.conf'
   'etc/systemd/oomd.conf.d/10-monarch.conf'
+  'etc/systemd/user/app.slice.d/10-monarch-oomd.conf'
+  'etc/systemd/zram-generator.conf.d/90-monarch.conf'
   'etc/sddm.conf.d/10-theme.conf'
   'etc/sddm.conf.d/10-wayland.conf'
 )

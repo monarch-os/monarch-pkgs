@@ -133,6 +133,22 @@ done
 cmp "$root/etc/os-release" "$root/usr/share/monarch/etc-overrides/os-release"
 echo 'ok - fresh installation needs only monarch and applies its defaults and scriptlet'
 
+memory_policies=(
+  etc/systemd/user/app.slice.d/10-monarch-oomd.conf
+  etc/systemd/zram-generator.conf.d/90-monarch.conf
+)
+for path in "${memory_policies[@]}"; do
+  printf '\n# Local memory policy customization\n' >>"$root/$path"
+  mkdir -p "$work/expected-memory/${path%/*}"
+  cp "$root/$path" "$work/expected-memory/$path"
+done
+pm -U --noconfirm "$unified"
+for path in "${memory_policies[@]}"; do
+  cmp "$root/$path" "$work/expected-memory/$path"
+  [[ ! -e $root/$path.pacsave ]]
+done
+echo 'ok - reinstalling preserves local memory policy customizations'
+
 root=$work/mismatch
 create_root
 # Deliberately bypass dependency checks to model an incomplete installation.
