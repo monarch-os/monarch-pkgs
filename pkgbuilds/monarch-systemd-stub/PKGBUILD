@@ -1,0 +1,48 @@
+pkgname=monarch-systemd-stub
+pkgver=262
+pkgrel=1
+pkgdesc="Systemd EFI stub preferring the loaded ESP for random-seed updates"
+arch=('x86_64')
+url="https://github.com/systemd/systemd/pull/43818"
+license=('LGPL-2.1-or-later')
+depends=('limine-mkinitcpio-hook')
+makedepends=('meson' 'ninja' 'python-jinja' 'python-pyelftools' 'gperf' 'libcap' 'util-linux')
+source=(
+  "systemd-$pkgver.tar.gz::https://github.com/systemd/systemd/archive/refs/tags/v$pkgver.tar.gz"
+  'prefer-loaded-esp.patch::https://github.com/systemd/systemd/commit/c578c1a66eff9a4c95642edfd2b7aca790b56e26.patch'
+)
+sha256sums=(
+  '6aa77506c0644aa67f940a48e3d3a7368601f787e4f249139516d353f107bcab'
+  '0239cd7a4c5afc34fa962f2e8bafbfa5aaa4918a81f048c8a8a0d0d3fecadbf9'
+)
+
+prepare() {
+  cd "systemd-$pkgver"
+  patch -Np1 -i "$srcdir/prefer-loaded-esp.patch"
+}
+
+build() {
+  meson setup build "systemd-$pkgver" \
+    --auto-features=disabled -Dbootloader=enabled -Defi=true \
+    -Dman=disabled -Dhtml=disabled -Dtests=false
+  ninja -C build src/boot/linuxx64.efi.stub
+}
+
+package() {
+  install -Dm644 build/src/boot/linuxx64.efi.stub \
+    "$pkgdir/usr/lib/monarch/boot/linuxx64.efi.stub"
+  install -d "$pkgdir/usr/share/limine-entry-tool.d" "$pkgdir/usr/share/libalpm/hooks"
+  printf '%s\n' 'MKINITCPIO_UKI_OPTIONS="--no-ukify --uefistub /usr/lib/monarch/boot/linuxx64.efi.stub"' \
+    >"$pkgdir/usr/share/limine-entry-tool.d/monarch-stub.conf"
+  cat >"$pkgdir/usr/share/libalpm/hooks/99-monarch-stub.hook" <<'HOOK'
+[Trigger]
+Operation = Upgrade
+Type = Path
+Target = usr/lib/monarch/boot/linuxx64.efi.stub
+
+[Action]
+Description = Rebuilding UKIs with the updated Monarch EFI stub
+When = PostTransaction
+Exec = /usr/bin/limine-mkinitcpio
+HOOK
+}
