@@ -1,13 +1,14 @@
 pkgbase=monarch
 pkgname=(monarch monarch-settings)
 pkgver=0.1.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Monarch desktop runtime and defaults"
 arch=('any')
 url="https://github.com/monarch-os/monarch"
 license=('MIT' 'LicenseRef-unknown')
 depends=(
   'bash'
+  'binutils'
   'python'
   'limine'
   'limine-mkinitcpio-hook'
@@ -66,12 +67,36 @@ if [[ -z ${MONARCH_SRC:-} ]]; then
   sha256sums+=('SKIP')
 fi
 
+# A copied worktree gitfile can point outside the container; freeze provenance before crossing that boundary.
+_validate_local_provenance() {
+  if [[ -n ${MONARCH_LOCAL_PKGVER:-} || -n ${MONARCH_LOCAL_REVISION:-} ]]; then
+    if [[ -z ${MONARCH_SRC:-} || ! ${MONARCH_LOCAL_PKGVER:-} =~ ^[0-9A-Za-z.+_]+$ ||
+      ! ${MONARCH_LOCAL_REVISION:-} =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+      printf '%s\n' 'Invalid local source provenance: provide MONARCH_SRC, MONARCH_LOCAL_PKGVER and full MONARCH_LOCAL_REVISION together' >&2
+      return 1
+    fi
+    local revision
+    if revision=$(git -C "$MONARCH_SRC" rev-parse --verify HEAD 2>/dev/null); then
+      if [[ $revision != "$MONARCH_LOCAL_REVISION" ]]; then
+        printf '%s\n' 'Local source revision does not match MONARCH_LOCAL_REVISION' >&2
+        return 1
+      fi
+    fi
+  fi
+}
+
 pkgver() {
+  _validate_local_provenance || return 1
+  if [[ -n ${MONARCH_LOCAL_PKGVER:-} ]]; then
+    printf '%s\n' "$MONARCH_LOCAL_PKGVER"
+    return
+  fi
   cd "$srcdir/monarch"
   if [[ -e .git ]]; then
     local description tag
     tag=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-version:refname |
       awk '/^v[1-9][0-9]{3}\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]*)$/ && !found { print; found=1 }')
+    git rev-parse --verify HEAD >/dev/null || return 1
     if [[ -n $tag ]] && description=$(git describe --tags --match "$tag" 2>/dev/null); then
       printf '%s\n' "$description" | sed 's/^v//;s/-/.r/;s/-/./'
     else
@@ -83,6 +108,7 @@ pkgver() {
 }
 
 prepare() {
+  _validate_local_provenance || return 1
   if [[ -n ${MONARCH_SRC:-} ]]; then
     rm -rf "$srcdir/monarch"
     mkdir -p "$srcdir/monarch"
@@ -91,6 +117,7 @@ prepare() {
 }
 
 package_monarch() {
+  _validate_local_provenance || return 1
   cd "$srcdir/monarch"
   provides=("monarch-settings=$pkgver")
 
@@ -100,8 +127,10 @@ package_monarch() {
   cp "$srcdir/monarch"/{LICENSE,README.md,boot.sh,install.sh,icon.png,icon.txt,logo.svg,logo.txt} \
     "$pkgdir/usr/share/monarch/"
   printf '%s\n' "$pkgver" >"$pkgdir/usr/share/monarch/version"
-  if [[ -e $srcdir/monarch/.git ]]; then
-    git -C "$srcdir/monarch" rev-parse HEAD >"$pkgdir/usr/share/monarch/revision"
+  if [[ -n ${MONARCH_LOCAL_REVISION:-} ]]; then
+    printf '%s\n' "$MONARCH_LOCAL_REVISION" >"$pkgdir/usr/share/monarch/revision"
+  elif [[ -e $srcdir/monarch/.git ]]; then
+    git -C "$srcdir/monarch" rev-parse HEAD >"$pkgdir/usr/share/monarch/revision" || return 1
   fi
 
   find "$pkgdir/usr/share/monarch/bin" -maxdepth 1 -type f \
