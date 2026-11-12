@@ -202,6 +202,11 @@ build_package() {
   # replacement prompts are auto-accepted instead of aborting the build.
   MAKEPKG_FLAGS="-scf --noconfirm"
 
+  local VOXTYPE_VARIANTS=""
+  if [[ $pkg == voxtype-bin ]]; then
+    VOXTYPE_VARIANTS=all
+    export VOXTYPE_VARIANTS
+  fi
   if PACMAN=/usr/local/bin/pacman-for-makepkg build_with_makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
