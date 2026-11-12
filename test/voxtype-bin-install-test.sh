@@ -19,11 +19,13 @@ launcher="$TEST_ROOT/usr/bin/voxtype"
 detected_cuda=13
 architecture=x86_64
 uname() { echo "$architecture"; }
-grep() {
-    if [[ $* == '-q avx512f /proc/cpuinfo' ]]; then
-        return 1
-    fi
-    command grep "$@"
+cpu_avx2=1
+cpu_avx512=1
+_cpu_has() {
+    case "$1" in
+        avx2) (( cpu_avx2 )) ;;
+        avx512f) (( cpu_avx512 )) ;;
+    esac
 }
 _detect_cuda_major() { echo "$detected_cuda"; }
 _detect_gpu() { :; }
@@ -41,14 +43,14 @@ restore() {
     pass "$3"
 }
 
-for name in voxtype-avx2 voxtype-avx512 voxtype-cpu voxtype-vulkan voxtype-onnx-avx2 voxtype-onnx-avx512; do
+for name in voxtype-baseline voxtype-avx2 voxtype-avx512 voxtype-cpu voxtype-vulkan voxtype-onnx-avx2 voxtype-onnx-avx512; do
     touch "$_backend_root/$name"
 done
 for name in cuda-12 cuda-13 migraphx; do
     mkdir "$_backend_root/$name"
     touch "$_backend_root/$name/voxtype-onnx-$name"
 done
-default="$_backend_root/voxtype-avx2"
+default="$_backend_root/voxtype-avx512"
 touch "$TEST_ROOT/payload"
 ln -s "$TEST_ROOT/payload" "$_backend_root/escape"
 ln -s "$TEST_ROOT" "$_backend_root/outside"
@@ -66,9 +68,15 @@ restore "$_backend_root/dangling" "$default" 'dangling symlink rejected'
 restore "$_backend_root/loop" "$default" 'symlink loop rejected'
 restore "$_backend_root/cuda-13" "$default" 'directory rejected'
 restore "$TEST_ROOT/voxtype-parakeet-avx512" "$default" 'foreign legacy name rejected'
-restore "$_backend_root/internal" "$default" 'internal symlink canonicalized'
+restore "$_backend_root/internal" "$_backend_root/voxtype-avx2" 'internal symlink canonicalized'
 restore "$_backend_root/voxtype-vulkan" "$_backend_root/voxtype-vulkan" 'existing GPU backend preserved'
 restore "$_backend_root/voxtype-avx512" "$_backend_root/voxtype-avx512" 'existing CPU backend preserved'
+cpu_avx512=0
+restore "$_backend_root/voxtype-avx512" "$_backend_root/voxtype-avx2" 'unsupported AVX512 falls back to AVX2'
+cpu_avx2=0
+restore "$_backend_root/voxtype-avx2" "$_backend_root/voxtype-baseline" 'unsupported AVX2 falls back to baseline'
+cpu_avx2=1
+cpu_avx512=1
 restore "$_backend_root/voxtype-parakeet-avx2" "$_backend_root/voxtype-onnx-avx2" 'legacy Parakeet AVX2 mapped'
 restore "$_backend_root/voxtype-parakeet-avx512" "$_backend_root/voxtype-onnx-avx512" 'legacy Parakeet AVX512 mapped'
 restore "$_backend_root/voxtype-onnx-rocm" "$_backend_root/migraphx/voxtype-onnx-migraphx" 'legacy ROCm mapped to GPU wrapper'
