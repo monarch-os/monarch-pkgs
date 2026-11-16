@@ -94,16 +94,6 @@ _set_default_backend() {
     fi
 }
 
-_canonical_backend() {
-    local target
-    target=$(readlink -f -- "$1" 2>/dev/null) || return 1
-    case "$target" in
-        "$_backend_root"/*) [ -f "$target" ] || return 1 ;;
-        *) return 1 ;;
-    esac
-    printf '%s\n' "$target"
-}
-
 # Tell the user the backend they had is not in this build, and how to get it
 # back. Goes to stderr because the caller captures stdout; pacman shows both.
 _warn_lost_backend() {
@@ -126,24 +116,22 @@ _warn_lost_backend() {
 _preserve_or_set_backend() {
     # Restore saved backend from pre_upgrade, or set default
     local saved="$_backend_state" target="" resolved now
-    if [ -f "$saved" ] && [ ! -L "$saved" ]; then
-        target=$(cat -- "$saved") || return 1
-    fi
-    rm -f -- "$saved" || return 1
-    if [ -n "$target" ]; then
+    if [ -f "$saved" ]; then
+        target=$(cat "$saved")
+        rm -f "$saved"
 
         # Compatibility map for 0.6.x -> 0.7.x binary renames. Users who
         # had an ONNX engine selected on 0.6.x would otherwise fall back
         # to CPU Whisper after upgrade because the old binary names no
         # longer exist; the map preserves engine intent across the rename.
         case "$target" in
-            "$_backend_root"/voxtype-parakeet-avx2)
+            */voxtype-parakeet-avx2)
                 target="$_backend_root/voxtype-onnx-avx2" ;;
-            "$_backend_root"/voxtype-parakeet-avx512)
+            */voxtype-parakeet-avx512)
                 target="$_backend_root/voxtype-onnx-avx512" ;;
-            "$_backend_root"/voxtype-onnx-rocm)
+            */voxtype-onnx-rocm)
                 target="$_backend_root/migraphx/voxtype-onnx-migraphx" ;;
-            "$_backend_root"/voxtype-onnx-cuda)
+            */voxtype-onnx-cuda)
                 # 0.7.0 split CUDA into 12/13. Pick the variant matching
                 # the host's libcudart soname; fall back to cuda-13 if
                 # neither is detected (modern default).
@@ -170,11 +158,11 @@ _preserve_or_set_backend() {
             *) target="" ;;
         esac
         if [ -n "$target" ]; then
-            resolved=$(readlink -f -- "$target" 2>/dev/null) || resolved=""
+            resolved=$(readlink -f -- "$target" 2>/dev/null)
             case "$resolved" in
                 "$_backend_root"/*)
                     if [ -f "$resolved" ]; then
-                        _install_active_binary "$resolved" || return 1
+                        _install_active_binary "$resolved"
                         # Strip the /usr/lib/voxtype/[<subdir>/]voxtype- prefix for the echo
                         local short=${resolved##*/voxtype-}
                         echo "${short%/*}"
@@ -194,7 +182,7 @@ _preserve_or_set_backend() {
     fi
 
     # No saved state, or the saved backend is gone - set default
-    now=$(_set_default_backend) || return 1
+    now=$(_set_default_backend)
     if [ -n "$target" ]; then
         _warn_lost_backend "${target##*/}" "$now"
     fi
@@ -376,11 +364,11 @@ pre_upgrade() {
     # to canonicalize for ORT's provider .so lookup).
     # A file an interrupted upgrade left behind must not be taken for the
     # current state.
-    rm -f -- "$_backend_state" || return 1
+    rm -f "$_backend_state"
     local target
     target=$(_resolve_active_binary)
-    if target=$(_canonical_backend "$target"); then
-        (umask 077; set -C; printf '%s\n' "$target" > "$_backend_state")
+    if [ -n "$target" ]; then
+        echo "$target" > "$_backend_state"
     fi
 }
 
@@ -396,7 +384,7 @@ post_upgrade() {
     echo "==> Voxtype upgraded to $version"
     echo ""
 
-    BACKEND=$(_preserve_or_set_backend) || return 1
+    BACKEND=$(_preserve_or_set_backend)
     echo "    Backend: $BACKEND (using voxtype-$BACKEND)"
 
     # Re-pick the CUDA variant on every upgrade in case the host's CUDA
@@ -438,7 +426,6 @@ post_upgrade() {
 }
 
 post_remove() {
-    rm -f -- "$_backend_state"
     rm -f /usr/bin/voxtype
     rm -f /usr/lib/voxtype/voxtype-onnx-cuda
 }
