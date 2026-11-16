@@ -4,7 +4,7 @@
 
 pkgname=onlyoffice-bin
 pkgver=10.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc='An office suite that combines text, spreadsheet and presentation editors'
 arch=('x86_64')
 url='https://www.onlyoffice.com/'
