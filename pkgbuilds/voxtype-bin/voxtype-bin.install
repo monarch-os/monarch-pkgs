@@ -75,7 +75,7 @@ _set_default_backend() {
     # aarch64 ships one generic CPU binary - no AVX2/AVX-512 split exists on
     # that architecture, so there's nothing to detect.
     if [ "$(uname -m)" = "aarch64" ]; then
-        _install_active_binary "$_backend_root/voxtype-cpu"
+        _install_active_binary "$_backend_root/voxtype-cpu" || return 1
         echo "cpu"
         return
     fi
@@ -83,25 +83,15 @@ _set_default_backend() {
     # A CPU without AVX2 (Ivy Bridge and older) gets the x86-64-v2 baseline
     # build; voxtype-avx2 would crash there on its first AVX2 instruction.
     if _cpu_has avx512f && [ -f "$_backend_root/voxtype-avx512" ]; then
-        _install_active_binary "$_backend_root/voxtype-avx512"
+        _install_active_binary "$_backend_root/voxtype-avx512" || return 1
         echo "avx512"
     elif _cpu_has avx2 && [ -f "$_backend_root/voxtype-avx2" ]; then
-        _install_active_binary "$_backend_root/voxtype-avx2"
+        _install_active_binary "$_backend_root/voxtype-avx2" || return 1
         echo "avx2"
     else
-        _install_active_binary "$_backend_root/voxtype-baseline"
+        _install_active_binary "$_backend_root/voxtype-baseline" || return 1
         echo "baseline"
     fi
-}
-
-_canonical_backend() {
-    local target
-    target=$(readlink -f -- "$1" 2>/dev/null) || return 1
-    case "$target" in
-        "$_backend_root"/*) [ -f "$target" ] || return 1 ;;
-        *) return 1 ;;
-    esac
-    printf '%s\n' "$target"
 }
 
 # Tell the user the backend they had is not in this build, and how to get it
@@ -126,24 +116,22 @@ _warn_lost_backend() {
 _preserve_or_set_backend() {
     # Restore saved backend from pre_upgrade, or set default
     local saved="$_backend_state" target="" resolved now
-    if [ -f "$saved" ] && [ ! -L "$saved" ]; then
-        target=$(cat -- "$saved") || return 1
-    fi
-    rm -f -- "$saved" || return 1
-    if [ -n "$target" ]; then
+    if [ -f "$saved" ]; then
+        target=$(cat "$saved")
+        rm -f "$saved"
 
         # Compatibility map for 0.6.x -> 0.7.x binary renames. Users who
         # had an ONNX engine selected on 0.6.x would otherwise fall back
         # to CPU Whisper after upgrade because the old binary names no
         # longer exist; the map preserves engine intent across the rename.
         case "$target" in
-            "$_backend_root"/voxtype-parakeet-avx2)
+            */voxtype-parakeet-avx2)
                 target="$_backend_root/voxtype-onnx-avx2" ;;
-            "$_backend_root"/voxtype-parakeet-avx512)
+            */voxtype-parakeet-avx512)
                 target="$_backend_root/voxtype-onnx-avx512" ;;
-            "$_backend_root"/voxtype-onnx-rocm)
+            */voxtype-onnx-rocm)
                 target="$_backend_root/migraphx/voxtype-onnx-migraphx" ;;
-            "$_backend_root"/voxtype-onnx-cuda)
+            */voxtype-onnx-cuda)
                 # 0.7.0 split CUDA into 12/13. Pick the variant matching
                 # the host's libcudart soname; fall back to cuda-13 if
                 # neither is detected (modern default).
@@ -170,7 +158,7 @@ _preserve_or_set_backend() {
             *) target="" ;;
         esac
         if [ -n "$target" ]; then
-            resolved=$(readlink -f -- "$target" 2>/dev/null) || resolved=""
+            resolved=$(readlink -f -- "$target" 2>/dev/null)
             case "$resolved" in
                 "$_backend_root"/*)
                     if [ -f "$resolved" ]; then
@@ -341,7 +329,7 @@ post_install() {
     echo "==> Voxtype Post-installation Steps:"
     echo ""
 
-    CPU_VARIANT=$(_set_default_backend)
+    CPU_VARIANT=$(_set_default_backend) || return 1
     echo "    CPU backend: $CPU_VARIANT (using voxtype-$CPU_VARIANT)"
 
     CUDA_PICK=$(_set_onnx_cuda_symlink)
@@ -376,11 +364,11 @@ pre_upgrade() {
     # to canonicalize for ORT's provider .so lookup).
     # A file an interrupted upgrade left behind must not be taken for the
     # current state.
-    rm -f -- "$_backend_state" || return 1
+    rm -f "$_backend_state"
     local target
     target=$(_resolve_active_binary)
-    if target=$(_canonical_backend "$target"); then
-        (umask 077; set -C; printf '%s\n' "$target" > "$_backend_state")
+    if [ -n "$target" ]; then
+        echo "$target" > "$_backend_state"
     fi
 }
 
@@ -438,7 +426,6 @@ post_upgrade() {
 }
 
 post_remove() {
-    rm -f -- "$_backend_state"
     rm -f /usr/bin/voxtype
     rm -f /usr/lib/voxtype/voxtype-onnx-cuda
 }
