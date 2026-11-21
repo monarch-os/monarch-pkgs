@@ -75,7 +75,7 @@ _set_default_backend() {
     # aarch64 ships one generic CPU binary - no AVX2/AVX-512 split exists on
     # that architecture, so there's nothing to detect.
     if [ "$(uname -m)" = "aarch64" ]; then
-        _install_active_binary "$_backend_root/voxtype-cpu" || return 1
+        _install_active_binary "$_backend_root/voxtype-cpu"
         echo "cpu"
         return
     fi
@@ -83,13 +83,13 @@ _set_default_backend() {
     # A CPU without AVX2 (Ivy Bridge and older) gets the x86-64-v2 baseline
     # build; voxtype-avx2 would crash there on its first AVX2 instruction.
     if _cpu_has avx512f && [ -f "$_backend_root/voxtype-avx512" ]; then
-        _install_active_binary "$_backend_root/voxtype-avx512" || return 1
+        _install_active_binary "$_backend_root/voxtype-avx512"
         echo "avx512"
     elif _cpu_has avx2 && [ -f "$_backend_root/voxtype-avx2" ]; then
-        _install_active_binary "$_backend_root/voxtype-avx2" || return 1
+        _install_active_binary "$_backend_root/voxtype-avx2"
         echo "avx2"
     else
-        _install_active_binary "$_backend_root/voxtype-baseline" || return 1
+        _install_active_binary "$_backend_root/voxtype-baseline"
         echo "baseline"
     fi
 }
@@ -162,7 +162,7 @@ _preserve_or_set_backend() {
             case "$resolved" in
                 "$_backend_root"/*)
                     if [ -f "$resolved" ]; then
-                        _install_active_binary "$resolved" || return 1
+                        _install_active_binary "$resolved"
                         # Strip the /usr/lib/voxtype/[<subdir>/]voxtype- prefix for the echo
                         local short=${resolved##*/voxtype-}
                         echo "${short%/*}"
@@ -182,7 +182,7 @@ _preserve_or_set_backend() {
     fi
 
     # No saved state, or the saved backend is gone - set default
-    now=$(_set_default_backend) || return 1
+    now=$(_set_default_backend)
     if [ -n "$target" ]; then
         _warn_lost_backend "${target##*/}" "$now"
     fi
@@ -329,7 +329,7 @@ post_install() {
     echo "==> Voxtype Post-installation Steps:"
     echo ""
 
-    CPU_VARIANT=$(_set_default_backend) || return 1
+    CPU_VARIANT=$(_set_default_backend)
     echo "    CPU backend: $CPU_VARIANT (using voxtype-$CPU_VARIANT)"
 
     CUDA_PICK=$(_set_onnx_cuda_symlink)
@@ -384,7 +384,7 @@ post_upgrade() {
     echo "==> Voxtype upgraded to $version"
     echo ""
 
-    BACKEND=$(_preserve_or_set_backend) || return 1
+    BACKEND=$(_preserve_or_set_backend)
     echo "    Backend: $BACKEND (using voxtype-$BACKEND)"
 
     # Re-pick the CUDA variant on every upgrade in case the host's CUDA
@@ -397,24 +397,20 @@ post_upgrade() {
     _print_variants
 
     echo ""
-    echo "    What's new since 1.1.1:"
-    echo "      * voxtype-bin downloads only the variants this machine uses:"
-    echo "        the CPU build, baseline, vulkan and the backend you run."
-    echo "        Set VOXTYPE_VARIANTS when building to add more, or to"
-    echo "        all for every variant."
-    echo "      * The Omarchy Settings panel ships in the package. Link it"
-    echo "        with voxtype setup omarchy; the daemon also links it on"
-    echo "        start."
-    echo "      * Every binary runs GGUF models through transcribe.cpp. The"
-    echo "        Vulkan and ONNX binaries ship a Vulkan-capable worker that"
-    echo "        falls back to the CPU when no GPU is available."
-    echo "      * Parakeet Ultra GGUF models cover 25 European languages with"
-    echo "        automatic language detection."
-    echo "      * Voxtype offers model upgrades when a better model is"
-    echo "        available. Review them with voxtype setup migrate or from"
-    echo "        the tray menu. Nothing changes until you accept one."
-    echo "      * vulkan-icd-loader is now a required dependency, because the"
-    echo "        GGUF workers link the Vulkan loader."
+    echo "    What's new in 1.3.0:"
+    echo "      * Meetings: a live meeting view shows the transcript as it"
+    echo "        happens, keeps speaker echo out of your lines, and lets you"
+    echo "        fix lines during the call or after. Search every meeting,"
+    echo "        and get a summary and action items when one ends."
+    echo "      * Voxtype offers to record a call it detects and stops when"
+    echo "        the call ends."
+    echo "      * Without Quickshell, meetings open in a GTK window. Install"
+    echo "        gtk4 for it."
+    echo "      * voxtype doctor checks your setup, and a failure shows a"
+    echo "        notification that names the fix."
+    echo "      * Failed recordings and text that could not be typed are"
+    echo "        kept instead of lost."
+    echo "      * Models download only from Voxtype's own mirror."
     echo ""
     _print_omarchy_hint
     echo "    Restart the daemon to apply updates:"
