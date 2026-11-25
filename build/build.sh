@@ -73,9 +73,9 @@ if [[ -f "$FINAL_OUTPUT_DIR/monarch.db.tar.zst" ]] || [[ -f "$FINAL_OUTPUT_DIR/m
 
 [monarch]
 SigLevel = Optional TrustAll
-Server = file://$FINAL_OUTPUT_DIR
+Server = ${MONARCH_REPO_SERVER:-file://$FINAL_OUTPUT_DIR}
 EOF
-  echo "  -> monarch (priority 2): $FINAL_OUTPUT_DIR"
+  echo "  -> monarch (priority 2): ${MONARCH_REPO_SERVER:-file://$FINAL_OUTPUT_DIR}"
 fi
 
 # Sync pacman database
@@ -209,7 +209,12 @@ build_package() {
   fi
   if PACMAN=/usr/local/bin/pacman-for-makepkg build_with_makepkg $MAKEPKG_FLAGS; then
     for pkg_file in *.pkg.tar.*; do
-      [[ -f "$pkg_file" ]] && cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
+      [[ -f "$pkg_file" ]] || continue
+      if [[ ${MONARCH_CLEAN_BUILD:-0} == 1 ]]; then
+        mv "$pkg_file" "$BUILD_OUTPUT_DIR/"
+      else
+        cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
+      fi
     done
 
     cd "$BUILD_OUTPUT_DIR"
@@ -227,6 +232,10 @@ build_package() {
     
     echo "    ✓ Successfully built $pkg"
     SUCCESSFUL_PACKAGES="$SUCCESSFUL_PACKAGES $pkg"
+    if [[ ${MONARCH_CLEAN_BUILD:-0} == 1 ]]; then
+      cd /src || return 1
+      rm -rf -- "$pkg"
+    fi
     return 0
   else
     echo "    ❌ Makepkg failed for $pkg"

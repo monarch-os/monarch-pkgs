@@ -102,6 +102,18 @@ recipe's declared `pkgrel`, and builds the same prepared sources with
 `--noextract`. This prevents makepkg's automatic reset to `pkgrel=1` from
 rebuilding an already published version indefinitely. Non-VCS recipes keep the
 normal single-pass build.
+
+For ephemeral CI builds, `build/build.sh` accepts `MONARCH_REPO_SERVER` to use
+an HTTP(S) package repository while keeping only its version database locally.
+`MONARCH_CLEAN_BUILD=1` moves completed archives into build-output and removes
+each successful package's source directory; failed sources remain available
+for diagnosis. Without these variables, local builds keep the file-backed
+repository and their source/output copies.
+
+Validate with `bash test/build-storage-test.sh` and
+`bash test/build-remote-repo-test.sh`. The latter uses Docker with a local
+`monarch-pkg-builder:latest-x86_64` image (override with `MONARCH_TEST_IMAGE`) and
+an isolated HTTP repository to build a package with an on-demand dependency.
 VCS detection loads the PKGBUILD as Bash, so function-keyword and indented
 `pkgver` declarations behave the same as `pkgver()` declarations.
 Release/version metadata comes from `makepkg --printsrcinfo`, using the same
