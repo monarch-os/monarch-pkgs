@@ -208,12 +208,14 @@ build_package() {
     export VOXTYPE_VARIANTS
   fi
   if PACMAN=/usr/local/bin/pacman-for-makepkg build_with_makepkg $MAKEPKG_FLAGS; then
+    local transfer=cp
+    [[ ${MONARCH_CLEAN_BUILD:-0} != 1 ]] || transfer=mv
     for pkg_file in *.pkg.tar.*; do
       [[ -f "$pkg_file" ]] || continue
-      if [[ ${MONARCH_CLEAN_BUILD:-0} == 1 ]]; then
-        mv "$pkg_file" "$BUILD_OUTPUT_DIR/"
-      else
-        cp "$pkg_file" "$BUILD_OUTPUT_DIR/"
+      if ! "$transfer" "$pkg_file" "$BUILD_OUTPUT_DIR/"; then
+        echo "    ❌ Failed to transfer $pkg_file; preserving build directory"
+        FAILED_PACKAGES="$FAILED_PACKAGES $pkg"
+        return 1
       fi
     done
 
